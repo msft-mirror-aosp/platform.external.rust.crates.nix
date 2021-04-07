@@ -23,7 +23,6 @@ license {
 
 rust_library {
     name: "libnix",
-    // has rustc warnings
     host_supported: true,
     crate_name: "nix",
     srcs: ["src/lib.rs"],
@@ -41,5 +40,5 @@ rust_library {
 
 // dependent_library ["feature_list"]
 //   bitflags-1.2.1 "default"
-//   cfg-if-0.1.10
-//   libc-0.2.89 "default,extra_traits,std"
+//   cfg-if-1.0.0
+//   libc-0.2.92 "default,extra_traits,std"

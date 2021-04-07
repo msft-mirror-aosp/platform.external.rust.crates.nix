@@ -847,12 +847,13 @@ impl<'a> ControlMessage<'a> {
             }
             #[cfg(any(target_os = "android", target_os = "linux"))]
             ControlMessage::AlgSetIv(iv) => {
+                #[allow(deprecated)] // https://github.com/rust-lang/libc/issues/1501
                 let af_alg_iv = libc::af_alg_iv {
                     ivlen: iv.len() as u32,
                     iv: [0u8; 0],
                 };
 
-                let size = mem::size_of::<libc::af_alg_iv>();
+                let size = mem::size_of_val(&af_alg_iv);
 
                 unsafe {
                     ptr::copy_nonoverlapping(
@@ -915,7 +916,7 @@ impl<'a> ControlMessage<'a> {
             }
             #[cfg(any(target_os = "android", target_os = "linux"))]
             ControlMessage::AlgSetIv(iv) => {
-                mem::size_of::<libc::af_alg_iv>() + iv.len()
+                mem::size_of_val(&iv) + iv.len()
             },
             #[cfg(any(target_os = "android", target_os = "linux"))]
             ControlMessage::AlgSetOp(op) => {
@@ -1216,17 +1217,18 @@ pub fn recvmmsg<'a, I>(
 
     let ret = unsafe { libc::recvmmsg(fd, output.as_mut_ptr(), output.len() as _, flags.bits() as _, timeout) };
 
-    let r = Errno::result(ret)?;
+    let _ = Errno::result(ret)?;
 
     Ok(output
         .into_iter()
+        .take(ret as usize)
         .zip(addresses.iter().map(|addr| unsafe{addr.assume_init()}))
         .zip(results.into_iter())
         .map(|((mmsghdr, address), (msg_controllen, cmsg_buffer))| {
             unsafe {
                 read_mhdr(
                     mmsghdr.msg_hdr,
-                    r as isize,
+                    mmsghdr.msg_len as isize,
                     msg_controllen,
                     address,
                     cmsg_buffer
@@ -1574,24 +1576,6 @@ pub fn send(fd: RawFd, buf: &[u8], flags: MsgFlags) -> Result<usize> {
  *
  */
 
-/// The protocol level at which to get / set socket options. Used as an
-/// argument to `getsockopt` and `setsockopt`.
-///
-/// [Further reading](http://pubs.opengroup.org/onlinepubs/9699919799/functions/setsockopt.html)
-#[repr(i32)]
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-pub enum SockLevel {
-    Socket = libc::SOL_SOCKET,
-    Tcp = libc::IPPROTO_TCP,
-    Ip = libc::IPPROTO_IP,
-    Ipv6 = libc::IPPROTO_IPV6,
-    Udp = libc::IPPROTO_UDP,
-    #[cfg(any(target_os = "android", target_os = "linux"))]
-    Netlink = libc::SOL_NETLINK,
-    #[cfg(any(target_os = "android", target_os = "linux"))]
-    Alg = libc::SOL_ALG,
-}
-
 /// Represents a socket option that can be accessed or set. Used as an argument
 /// to `getsockopt`
 pub trait GetSockOpt : Copy {
@@ -1716,6 +1700,15 @@ pub fn sockaddr_storage_to_addr(
                 *(addr as *const _ as *const sockaddr_un)
             };
             Ok(SockAddr::Unix(UnixAddr(sun, pathlen)))
+        }
+        #[cfg(any(target_os = "android", target_os = "linux"))]
+        libc::AF_PACKET => {
+            use libc::sockaddr_ll;
+            assert_eq!(len as usize, mem::size_of::<sockaddr_ll>());
+            let sll = unsafe {
+                *(addr as *const _ as *const sockaddr_ll)
+            };
+            Ok(SockAddr::Link(LinkAddr(sll)))
         }
         #[cfg(any(target_os = "android", target_os = "linux"))]
         libc::AF_NETLINK => {
