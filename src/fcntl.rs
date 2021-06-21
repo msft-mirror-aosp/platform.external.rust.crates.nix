@@ -34,6 +34,8 @@ libc_bitflags! {
         AT_NO_AUTOMOUNT;
         #[cfg(any(target_os = "android", target_os = "linux"))]
         AT_EMPTY_PATH;
+        #[cfg(any(target_os = "illumos", target_os = "solaris"))]
+        AT_EACCESS;
     }
 }
 
@@ -48,6 +50,7 @@ libc_bitflags!(
         /// Open the file in append-only mode.
         O_APPEND;
         /// Generate a signal when input or output becomes possible.
+        #[cfg(not(any(target_os = "illumos", target_os = "solaris")))]
         O_ASYNC;
         /// Closes the file descriptor once an `execve` call is made.
         ///
@@ -63,6 +66,7 @@ libc_bitflags!(
                   target_os = "netbsd"))]
         O_DIRECT;
         /// If the specified path isn't a directory, fail.
+        #[cfg(not(any(target_os = "illumos", target_os = "solaris")))]
         O_DIRECTORY;
         /// Implicitly follow each `write()` with an `fdatasync()`.
         #[cfg(any(target_os = "android",
@@ -162,7 +166,7 @@ libc_bitflags!(
 );
 
 // The conversion is not identical on all operating systems.
-#[allow(clippy::identity_conversion)]
+#[allow(clippy::useless_conversion)]
 pub fn open<P: ?Sized + NixPath>(path: &P, oflag: OFlag, mode: Mode) -> Result<RawFd> {
     let fd = path.with_nix_path(|cstr| {
         unsafe { libc::open(cstr.as_ptr(), oflag.bits(), mode.bits() as c_uint) }
@@ -172,7 +176,7 @@ pub fn open<P: ?Sized + NixPath>(path: &P, oflag: OFlag, mode: Mode) -> Result<R
 }
 
 // The conversion is not identical on all operating systems.
-#[allow(clippy::identity_conversion)]
+#[allow(clippy::useless_conversion)]
 #[cfg(not(target_os = "redox"))]
 pub fn openat<P: ?Sized + NixPath>(
     dirfd: RawFd,
@@ -248,8 +252,19 @@ fn inner_readlink<P: ?Sized + NixPath>(dirfd: Option<RawFd>, path: &P) -> Result
     }
     // Uh oh, the result is too long...
     // Let's try to ask lstat how many bytes to allocate.
-    let reported_size = super::sys::stat::lstat(path)
-        .and_then(|x| Ok(x.st_size))
+    let reported_size = match dirfd {
+        #[cfg(target_os = "redox")]
+        Some(_) => unreachable!(),
+        #[cfg(any(target_os = "android", target_os = "linux"))]
+        Some(dirfd) => {
+            let flags = if path.is_empty() { AtFlags::AT_EMPTY_PATH } else { AtFlags::empty() };
+            super::sys::stat::fstatat(dirfd, path, flags | AtFlags::AT_SYMLINK_NOFOLLOW)
+        },
+        #[cfg(not(any(target_os = "android", target_os = "linux", target_os = "redox")))]
+        Some(dirfd) => super::sys::stat::fstatat(dirfd, path, AtFlags::AT_SYMLINK_NOFOLLOW),
+        None => super::sys::stat::lstat(path)
+    }
+        .map(|x| x.st_size)
         .unwrap_or(0);
     let mut try_size = if reported_size > 0 {
         // Note: even if `lstat`'s apparently valid answer turns out to be
