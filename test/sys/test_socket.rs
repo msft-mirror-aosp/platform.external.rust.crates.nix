@@ -7,7 +7,6 @@ use std::path::Path;
 use std::slice;
 use std::str::FromStr;
 use libc::c_char;
-use tempfile;
 #[cfg(any(target_os = "linux", target_os= "android"))]
 use crate::*;
 
@@ -81,7 +80,7 @@ pub fn test_addr_equality_path() {
     let path = "/foo/bar";
     let actual = Path::new(path);
     let addr1 = UnixAddr::new(actual).unwrap();
-    let mut addr2 = addr1.clone();
+    let mut addr2 = addr1;
 
     addr2.0.sun_path[10] = 127;
 
@@ -168,7 +167,7 @@ mod recvfrom {
     use std::thread;
     use super::*;
 
-    const MSG: &'static [u8] = b"Hello, World!";
+    const MSG: &[u8] = b"Hello, World!";
 
     fn sendrecv<Fs, Fr>(rsock: RawFd, ssock: RawFd, f_send: Fs, mut f_recv: Fr) -> Option<SockAddr>
         where
@@ -318,6 +317,7 @@ mod recvfrom {
         target_os = "freebsd",
         target_os = "netbsd",
     ))]
+    #[allow(clippy::vec_init_then_push)]
     #[test]
     pub fn udp_sendmmsg() {
         use nix::sys::uio::IoVec;
@@ -367,7 +367,7 @@ mod recvfrom {
             }
             sendmmsg(s, msgs.iter(), flags)
                 .map(move |sent_bytes| {
-                    assert!(sent_bytes.len() >= 1);
+                    assert!(!sent_bytes.is_empty());
                     for sent in &sent_bytes {
                         assert_eq!(*sent, m.len());
                     }
@@ -425,7 +425,7 @@ mod recvfrom {
 
         for iov in &iovs {
             msgs.push_back(RecvMmsgData {
-                iov: iov,
+                iov,
                 cmsg_buffer: None,
             })
         };
@@ -497,7 +497,7 @@ mod recvfrom {
 
         for iov in &iovs {
             msgs.push_back(RecvMmsgData {
-                iov: iov,
+                iov,
                 cmsg_buffer: None,
             })
         };
@@ -757,6 +757,7 @@ pub fn test_af_alg_aead() {
         target_os = "netbsd"))]
 #[test]
 pub fn test_sendmsg_ipv4packetinfo() {
+    use cfg_if::cfg_if;
     use nix::sys::uio::IoVec;
     use nix::sys::socket::{socket, sendmsg, bind,
                            AddressFamily, SockType, SockFlag, SockAddr,
@@ -778,11 +779,21 @@ pub fn test_sendmsg_ipv4packetinfo() {
     let iov = [IoVec::from_slice(&slice)];
 
     if let InetAddr::V4(sin) = inet_addr {
-        let pi = libc::in_pktinfo {
-            ipi_ifindex: 0, /* Unspecified interface */
-            ipi_addr: libc::in_addr { s_addr: 0 },
-            ipi_spec_dst: sin.sin_addr,
-        };
+        cfg_if! {
+            if #[cfg(target_os = "netbsd")] {
+                drop(sin);
+                let pi = libc::in_pktinfo {
+                    ipi_ifindex: 0, /* Unspecified interface */
+                    ipi_addr: libc::in_addr { s_addr: 0 },
+                };
+            } else {
+                let pi = libc::in_pktinfo {
+                    ipi_ifindex: 0, /* Unspecified interface */
+                    ipi_addr: libc::in_addr { s_addr: 0 },
+                    ipi_spec_dst: sin.sin_addr,
+                };
+            }
+        }
 
         let cmsg = [ControlMessage::Ipv4PacketInfo(&pi)];
 
@@ -824,12 +835,9 @@ pub fn test_sendmsg_ipv6packetinfo() {
     let inet_addr = InetAddr::from_std(&std_sa);
     let sock_addr = SockAddr::new_inet(inet_addr);
 
-    match bind(sock, &sock_addr) {
-        Err(Error::Sys(Errno::EADDRNOTAVAIL)) => {
-            println!("IPv6 not available, skipping test.");
-            return;
-        },
-        _ => (),
+    if let Err(Error::Sys(Errno::EADDRNOTAVAIL)) = bind(sock, &sock_addr) {
+        println!("IPv6 not available, skipping test.");
+        return;
     }
 
     let slice = [1u8, 2, 3, 4, 5, 6, 7, 8];
@@ -1388,8 +1396,8 @@ pub fn test_recvif() {
                 _ => panic!("unexpected additional control msg"),
             }
         }
-        assert_eq!(rx_recvif, true);
-        assert_eq!(rx_recvdstaddr, true);
+        assert!(rx_recvif);
+        assert!(rx_recvdstaddr);
         assert_eq!(msg.bytes, 8);
         assert_eq!(
             iovec[0].as_slice(),
@@ -1468,18 +1476,16 @@ pub fn test_recv_ipv6pktinfo() {
         );
 
         let mut cmsgs = msg.cmsgs();
-        match cmsgs.next() {
-            Some(ControlMessageOwned::Ipv6PacketInfo(pktinfo)) => {
-                let i = if_nametoindex(lo_name.as_bytes()).expect("if_nametoindex");
-                assert_eq!(
-                    pktinfo.ipi6_ifindex,
-                    i,
-                    "unexpected ifindex (expected {}, got {})",
-                    i,
-                    pktinfo.ipi6_ifindex
-                );
-            }
-            _ => (),
+        if let Some(ControlMessageOwned::Ipv6PacketInfo(pktinfo)) = cmsgs.next()
+        {
+            let i = if_nametoindex(lo_name.as_bytes()).expect("if_nametoindex");
+            assert_eq!(
+                pktinfo.ipi6_ifindex as libc::c_uint,
+                i,
+                "unexpected ifindex (expected {}, got {})",
+                i,
+                pktinfo.ipi6_ifindex
+            );
         }
         assert!(cmsgs.next().is_none(), "unexpected additional control msg");
         assert_eq!(msg.bytes, 8);
@@ -1507,16 +1513,10 @@ pub fn test_vsock() {
                     SockFlag::empty(), None)
              .expect("socket failed");
 
-    // VMADDR_CID_HYPERVISOR and VMADDR_CID_LOCAL are reserved, so we expect
-    // an EADDRNOTAVAIL error.
+    // VMADDR_CID_HYPERVISOR is reserved, so we expect an EADDRNOTAVAIL error.
     let sockaddr = SockAddr::new_vsock(libc::VMADDR_CID_HYPERVISOR, port);
     assert_eq!(bind(s1, &sockaddr).err(),
                Some(Error::Sys(Errno::EADDRNOTAVAIL)));
-
-    let sockaddr = SockAddr::new_vsock(libc::VMADDR_CID_LOCAL, port);
-    assert_eq!(bind(s1, &sockaddr).err(),
-               Some(Error::Sys(Errno::EADDRNOTAVAIL)));
-
 
     let sockaddr = SockAddr::new_vsock(libc::VMADDR_CID_ANY, port);
     assert_eq!(bind(s1, &sockaddr), Ok(()));
@@ -1540,4 +1540,112 @@ pub fn test_vsock() {
 
     close(s1).unwrap();
     thr.join().unwrap();
+}
+
+// Disable the test on emulated platforms because it fails in Cirrus-CI.  Lack of QEMU
+// support is suspected.
+#[cfg_attr(not(any(target_arch = "x86_64")), ignore)]
+#[cfg(all(target_os = "linux"))]
+#[test]
+fn test_recvmsg_timestampns() {
+    use nix::sys::socket::*;
+    use nix::sys::uio::IoVec;
+    use nix::sys::time::*;
+    use std::time::*;
+
+    // Set up
+    let message = "Ohayō!".as_bytes();
+    let in_socket = socket(
+        AddressFamily::Inet,
+        SockType::Datagram,
+        SockFlag::empty(),
+        None).unwrap();
+    setsockopt(in_socket, sockopt::ReceiveTimestampns, &true).unwrap();
+    let localhost = InetAddr::new(IpAddr::new_v4(127, 0, 0, 1), 0);
+    bind(in_socket, &SockAddr::new_inet(localhost)).unwrap();
+    let address = getsockname(in_socket).unwrap();
+    // Get initial time
+    let time0 = SystemTime::now();
+    // Send the message
+    let iov = [IoVec::from_slice(message)];
+    let flags = MsgFlags::empty();
+    let l = sendmsg(in_socket, &iov, &[], flags, Some(&address)).unwrap();
+    assert_eq!(message.len(), l);
+    // Receive the message
+    let mut buffer = vec![0u8; message.len()];
+    let mut cmsgspace = nix::cmsg_space!(TimeSpec);
+    let iov = [IoVec::from_mut_slice(&mut buffer)];
+    let r = recvmsg(in_socket, &iov, Some(&mut cmsgspace), flags).unwrap();
+    let rtime = match r.cmsgs().next() {
+        Some(ControlMessageOwned::ScmTimestampns(rtime)) => rtime,
+        Some(_) => panic!("Unexpected control message"),
+        None => panic!("No control message")
+    };
+    // Check the final time
+    let time1 = SystemTime::now();
+    // the packet's received timestamp should lie in-between the two system
+    // times, unless the system clock was adjusted in the meantime.
+    let rduration = Duration::new(rtime.tv_sec() as u64,
+    rtime.tv_nsec() as u32);
+    assert!(time0.duration_since(UNIX_EPOCH).unwrap() <= rduration);
+    assert!(rduration <= time1.duration_since(UNIX_EPOCH).unwrap());
+    // Close socket
+    nix::unistd::close(in_socket).unwrap();
+}
+
+// Disable the test on emulated platforms because it fails in Cirrus-CI.  Lack of QEMU
+// support is suspected.
+#[cfg_attr(not(any(target_arch = "x86_64")), ignore)]
+#[cfg(all(target_os = "linux"))]
+#[test]
+fn test_recvmmsg_timestampns() {
+    use nix::sys::socket::*;
+    use nix::sys::uio::IoVec;
+    use nix::sys::time::*;
+    use std::time::*;
+
+    // Set up
+    let message = "Ohayō!".as_bytes();
+    let in_socket = socket(
+        AddressFamily::Inet,
+        SockType::Datagram,
+        SockFlag::empty(),
+        None).unwrap();
+    setsockopt(in_socket, sockopt::ReceiveTimestampns, &true).unwrap();
+    let localhost = InetAddr::new(IpAddr::new_v4(127, 0, 0, 1), 0);
+    bind(in_socket, &SockAddr::new_inet(localhost)).unwrap();
+    let address = getsockname(in_socket).unwrap();
+    // Get initial time
+    let time0 = SystemTime::now();
+    // Send the message
+    let iov = [IoVec::from_slice(message)];
+    let flags = MsgFlags::empty();
+    let l = sendmsg(in_socket, &iov, &[], flags, Some(&address)).unwrap();
+    assert_eq!(message.len(), l);
+    // Receive the message
+    let mut buffer = vec![0u8; message.len()];
+    let mut cmsgspace = nix::cmsg_space!(TimeSpec);
+    let iov = [IoVec::from_mut_slice(&mut buffer)];
+    let mut data = vec![
+        RecvMmsgData {
+            iov,
+            cmsg_buffer: Some(&mut cmsgspace),
+        },
+    ];
+    let r = recvmmsg(in_socket, &mut data, flags, None).unwrap();
+    let rtime = match r[0].cmsgs().next() {
+        Some(ControlMessageOwned::ScmTimestampns(rtime)) => rtime,
+        Some(_) => panic!("Unexpected control message"),
+        None => panic!("No control message")
+    };
+    // Check the final time
+    let time1 = SystemTime::now();
+    // the packet's received timestamp should lie in-between the two system
+    // times, unless the system clock was adjusted in the meantime.
+    let rduration = Duration::new(rtime.tv_sec() as u64,
+    rtime.tv_nsec() as u32);
+    assert!(time0.duration_since(UNIX_EPOCH).unwrap() <= rduration);
+    assert!(rduration <= time1.duration_since(UNIX_EPOCH).unwrap());
+    // Close socket
+    nix::unistd::close(in_socket).unwrap();
 }
