@@ -1,7 +1,60 @@
 # Change Log
 
 All notable changes to this project will be documented in this file.
-This project adheres to [Semantic Versioning](http://semver.org/).
+This project adheres to [Semantic Versioning](https://semver.org/).
+
+## [Unreleased] - ReleaseDate
+### Added
+### Changed
+### Fixed
+### Removed
+
+## [0.21.0] - 31 May 2021
+### Added
+- Added `getresuid` and `getresgid`
+  (#[1430](https://github.com/nix-rust/nix/pull/1430))
+- Added TIMESTAMPNS support for linux
+  (#[1402](https://github.com/nix-rust/nix/pull/1402))
+- Added `sendfile64` (#[1439](https://github.com/nix-rust/nix/pull/1439))
+- Added `MS_LAZYTIME` to `MsFlags`
+  (#[1437](https://github.com/nix-rust/nix/pull/1437))
+
+### Changed
+- Made `forkpty` unsafe, like `fork`
+  (#[1390](https://github.com/nix-rust/nix/pull/1390))
+- Made `Uid`, `Gid` and `Pid` methods `from_raw` and `as_raw` a `const fn`
+  (#[1429](https://github.com/nix-rust/nix/pull/1429))
+- Made `Uid::is_root` a `const fn`
+  (#[1429](https://github.com/nix-rust/nix/pull/1429))
+- `AioCb` is now always pinned.  Once a `libc::aiocb` gets sent to the kernel,
+  its address in memory must not change.  Nix now enforces that by using
+  `std::pin`.  Most users won't need to change anything, except when using
+  `aio_suspend`.  See that method's documentation for the new usage.
+  (#[1440](https://github.com/nix-rust/nix/pull/1440))
+- `LioCb` is now constructed using a distinct `LioCbBuilder` struct.  This
+  avoids a soundness issue with the old `LioCb`.  Usage is similar but
+  construction now uses the builder pattern.  See the documentation for
+  details.
+  (#[1440](https://github.com/nix-rust/nix/pull/1440))
+- Minimum supported Rust version is now 1.41.0.
+  ([#1440](https://github.com/nix-rust/nix/pull/1440))
+
+### Fixed
+- Allow `sockaddr_ll` size, as reported by the Linux kernel, to be smaller then it's definition
+  (#[1395](https://github.com/nix-rust/nix/pull/1395))
+- Fix spurious errors using `sendmmsg` with multiple cmsgs
+  (#[1414](https://github.com/nix-rust/nix/pull/1414))
+
+### Removed
+
+- Removed `sys::socket::accept4` from Android arm because libc removed it in
+  version 0.2.87.
+  ([#1399](https://github.com/nix-rust/nix/pull/1399))
+- `AioCb::from_boxed_slice` and `AioCb::from_boxed_mut_slice` have been
+  removed.  They were useful with earlier versions of Rust, but should no
+  longer be needed now that async/await are available.  `AioCb`s now work
+  exclusively with borrowed buffers, not owned ones.
+  (#[1440](https://github.com/nix-rust/nix/pull/1440))
 
 ## [0.20.0] - 20 February 2021
 ### Added
