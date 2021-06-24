@@ -31,6 +31,7 @@ rust_library {
         "libbitflags",
         "libcfg_if",
         "liblibc",
+        "libmemoffset",
     ],
     apex_available: [
         "//apex_available:platform",
@@ -40,6 +41,8 @@ rust_library {
 }
 
 // dependent_library ["feature_list"]
+//   autocfg-1.0.1
 //   bitflags-1.2.1 "default"
 //   cfg-if-1.0.0
-//   libc-0.2.94 "default,extra_traits,std"
+//   libc-0.2.97 "default,extra_traits,std"
+//   memoffset-0.6.4 "default"
