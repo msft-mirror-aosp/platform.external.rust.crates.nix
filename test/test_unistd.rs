@@ -23,7 +23,7 @@ use std::os::unix::prelude::*;
 #[cfg(not(target_os = "redox"))]
 use std::path::Path;
 use tempfile::{tempdir, tempfile};
-use libc::{_exit, off_t};
+use libc::{_exit, mode_t, off_t};
 
 use crate::*;
 
@@ -102,7 +102,7 @@ fn test_mkfifo() {
     mkfifo(&mkfifo_fifo, Mode::S_IRUSR).unwrap();
 
     let stats = stat::stat(&mkfifo_fifo).unwrap();
-    let typ = stat::SFlag::from_bits_truncate(stats.st_mode);
+    let typ = stat::SFlag::from_bits_truncate(stats.st_mode as mode_t);
     assert!(typ == SFlag::S_IFIFO);
 }
 
@@ -224,7 +224,11 @@ fn test_setgroups() {
 
 #[test]
 // `getgroups()` and `setgroups()` do not behave as expected on Apple platforms
-#[cfg(not(any(target_os = "ios", target_os = "macos", target_os = "redox", target_os = "fuchsia")))]
+#[cfg(not(any(target_os = "ios",
+              target_os = "macos",
+              target_os = "redox",
+              target_os = "fuchsia",
+              target_os = "illumos")))]
 fn test_initgroups() {
     // Skip this test when not run as root as `initgroups()` and `setgroups()`
     // require root.
@@ -366,10 +370,12 @@ cfg_if!{
         execve_test_factory!(test_execve, execve, CString::new("/bin/sh").unwrap().as_c_str());
         execve_test_factory!(test_fexecve, fexecve, File::open("/bin/sh").unwrap().into_raw_fd());
     } else if #[cfg(any(target_os = "dragonfly",
+                        target_os = "illumos",
                         target_os = "ios",
                         target_os = "macos",
                         target_os = "netbsd",
-                        target_os = "openbsd"))] {
+                        target_os = "openbsd",
+                        target_os = "solaris"))] {
         execve_test_factory!(test_execve, execve, CString::new("/bin/sh").unwrap().as_c_str());
         // No fexecve() on DragonFly, ios, macos, NetBSD, OpenBSD.
         //
@@ -435,7 +441,7 @@ fn test_getcwd() {
     // kicks in.  Note: One path cannot be longer than 255 bytes
     // (NAME_MAX) whole path cannot be longer than PATH_MAX (usually
     // 4096 on linux, 1024 on macos)
-    let mut inner_tmp_dir = tmpdir_path.to_path_buf();
+    let mut inner_tmp_dir = tmpdir_path;
     for _ in 0..5 {
         let newdir = iter::repeat("a").take(100).collect::<String>();
         inner_tmp_dir.push(newdir);
@@ -618,15 +624,34 @@ fn test_sysconf_unsupported() {
     assert!(open_max.expect("sysconf failed").is_none())
 }
 
+
+#[cfg(any(target_os = "android", target_os = "linux"))]
+#[test]
+fn test_getresuid() {
+    let resuids = getresuid().unwrap();
+    assert!(resuids.real.as_raw() != libc::uid_t::max_value());
+    assert!(resuids.effective.as_raw() != libc::uid_t::max_value());
+    assert!(resuids.saved.as_raw() != libc::uid_t::max_value());
+}
+
+#[cfg(any(target_os = "android", target_os = "linux"))]
+#[test]
+fn test_getresgid() {
+    let resgids = getresgid().unwrap();
+    assert!(resgids.real.as_raw() != libc::gid_t::max_value());
+    assert!(resgids.effective.as_raw() != libc::gid_t::max_value());
+    assert!(resgids.saved.as_raw() != libc::gid_t::max_value());
+}
+
 // Test that we can create a pair of pipes.  No need to verify that they pass
 // data; that's the domain of the OS, not nix.
 #[test]
 fn test_pipe() {
     let (fd0, fd1) = pipe().unwrap();
-    let m0 = stat::SFlag::from_bits_truncate(stat::fstat(fd0).unwrap().st_mode);
+    let m0 = stat::SFlag::from_bits_truncate(stat::fstat(fd0).unwrap().st_mode as mode_t);
     // S_IFIFO means it's a pipe
     assert_eq!(m0, SFlag::S_IFIFO);
-    let m1 = stat::SFlag::from_bits_truncate(stat::fstat(fd1).unwrap().st_mode);
+    let m1 = stat::SFlag::from_bits_truncate(stat::fstat(fd1).unwrap().st_mode as mode_t);
     assert_eq!(m1, SFlag::S_IFIFO);
 }
 
@@ -636,10 +661,12 @@ fn test_pipe() {
           target_os = "dragonfly",
           target_os = "emscripten",
           target_os = "freebsd",
+          target_os = "illumos",
           target_os = "linux",
           target_os = "netbsd",
           target_os = "openbsd",
-          target_os = "redox"))]
+          target_os = "redox",
+          target_os = "solaris"))]
 #[test]
 fn test_pipe2() {
     let (fd0, fd1) = pipe2(OFlag::O_CLOEXEC).unwrap();
@@ -721,7 +748,7 @@ fn test_alarm() {
     // Overwriting an alarm should return the old alarm.
     assert_eq!(alarm::set(1), Some(60));
 
-    // We should be woken up after 1 second by the alarm, so we'll sleep for 2
+    // We should be woken up after 1 second by the alarm, so we'll sleep for 3
     // seconds to be sure.
     let starttime = Instant::now();
     loop {
@@ -918,7 +945,9 @@ fn test_linkat_follow_symlink() {
     let newfilestat = stat::stat(&newfilepath).unwrap();
 
     // Check the file type of the new link
-    assert!((stat::SFlag::from_bits_truncate(newfilestat.st_mode) & SFlag::S_IFMT) ==  SFlag::S_IFREG);
+    assert_eq!((stat::SFlag::from_bits_truncate(newfilestat.st_mode as mode_t) & SFlag::S_IFMT),
+        SFlag::S_IFREG
+    );
 
     // Check the number of hard links to the original file
     assert_eq!(newfilestat.st_nlink, 2);
