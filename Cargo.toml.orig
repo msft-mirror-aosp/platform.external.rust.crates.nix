@@ -2,7 +2,7 @@
 name        = "nix"
 description = "Rust friendly bindings to *nix APIs"
 edition     = "2018"
-version     = "0.21.0"
+version     = "0.22.0"
 authors     = ["The nix-rust Project Developers"]
 repository  = "https://github.com/nix-rust/nix"
 license     = "MIT"
@@ -32,7 +32,7 @@ targets = [
 ]
 
 [dependencies]
-libc = { version = "0.2.95", features = [ "extra_traits" ] }
+libc = { version = "0.2.98", features = [ "extra_traits" ] }
 bitflags = "1.1"
 cfg-if = "1.0"
 

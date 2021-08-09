@@ -1,6 +1,6 @@
 #[cfg(not(target_os = "redox"))]
 use nix::fcntl::{self, open, readlink};
-use nix::fcntl::{fcntl, FcntlArg, FdFlag, OFlag};
+use nix::fcntl::OFlag;
 use nix::unistd::*;
 use nix::unistd::ForkResult::*;
 #[cfg(not(target_os = "redox"))]
@@ -10,17 +10,15 @@ use nix::sys::stat::{self, Mode, SFlag};
 #[cfg(not(any(target_os = "redox", target_os = "fuchsia")))]
 use nix::pty::{posix_openpt, grantpt, unlockpt, ptsname};
 use nix::errno::Errno;
-#[cfg(not(target_os = "redox"))]
-use nix::Error;
 use std::{env, iter};
-#[cfg(not(target_os = "redox"))]
+#[cfg(not(any(target_os = "fuchsia", target_os = "redox")))]
 use std::ffi::CString;
 #[cfg(not(target_os = "redox"))]
 use std::fs::DirBuilder;
 use std::fs::{self, File};
 use std::io::Write;
 use std::os::unix::prelude::*;
-#[cfg(not(target_os = "redox"))]
+#[cfg(not(any(target_os = "fuchsia", target_os = "redox")))]
 use std::path::Path;
 use tempfile::{tempdir, tempfile};
 use libc::{_exit, mode_t, off_t};
@@ -135,6 +133,8 @@ fn test_mkfifoat_none() {
     target_os = "macos", target_os = "ios",
     target_os = "android", target_os = "redox")))]
 fn test_mkfifoat() {
+    use nix::fcntl;
+
     let tempdir = tempdir().unwrap();
     let dirfd = open(tempdir.path(), OFlag::empty(), Mode::empty()).unwrap();
     let mkfifoat_name = "mkfifoat_name";
@@ -258,7 +258,7 @@ fn test_initgroups() {
     setgroups(&old_groups).unwrap();
 }
 
-#[cfg(not(target_os = "redox"))]
+#[cfg(not(any(target_os = "fuchsia", target_os = "redox")))]
 macro_rules! execve_test_factory(
     ($test_name:ident, $syscall:ident, $exe: expr $(, $pathname:expr, $flags:expr)*) => (
 
@@ -669,6 +669,8 @@ fn test_pipe() {
           target_os = "solaris"))]
 #[test]
 fn test_pipe2() {
+    use nix::fcntl::{fcntl, FcntlArg, FdFlag};
+
     let (fd0, fd1) = pipe2(OFlag::O_CLOEXEC).unwrap();
     let f0 = FdFlag::from_bits_truncate(fcntl(fd0, FcntlArg::F_GETFD).unwrap());
     assert!(f0.contains(FdFlag::FD_CLOEXEC));
@@ -968,7 +970,7 @@ fn test_unlinkat_dir_noremovedir() {
 
     // Attempt unlink dir at relative path without proper flag
     let err_result = unlinkat(Some(dirfd), dirname, UnlinkatFlags::NoRemoveDir).unwrap_err();
-    assert!(err_result == Error::Sys(Errno::EISDIR) || err_result == Error::Sys(Errno::EPERM));
+    assert!(err_result == Errno::EISDIR || err_result == Errno::EPERM);
  }
 
 #[test]
@@ -1011,7 +1013,7 @@ fn test_unlinkat_file() {
 fn test_access_not_existing() {
     let tempdir = tempdir().unwrap();
     let dir = tempdir.path().join("does_not_exist.txt");
-    assert_eq!(access(&dir, AccessFlags::F_OK).err().unwrap().as_errno().unwrap(),
+    assert_eq!(access(&dir, AccessFlags::F_OK).err().unwrap(),
                Errno::ENOENT);
 }
 
@@ -1090,13 +1092,13 @@ fn test_ttyname() {
 fn test_ttyname_not_pty() {
     let fd = File::open("/dev/zero").unwrap();
     assert!(fd.as_raw_fd() > 0);
-    assert_eq!(ttyname(fd.as_raw_fd()), Err(Error::Sys(Errno::ENOTTY)));
+    assert_eq!(ttyname(fd.as_raw_fd()), Err(Errno::ENOTTY));
 }
 
 #[test]
 #[cfg(not(any(target_os = "redox", target_os = "fuchsia")))]
 fn test_ttyname_invalid_fd() {
-    assert_eq!(ttyname(-1), Err(Error::Sys(Errno::EBADF)));
+    assert_eq!(ttyname(-1), Err(Errno::EBADF));
 }
 
 #[test]
