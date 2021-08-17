@@ -238,6 +238,8 @@ cfg_if! {
 }
 sockopt_impl!(Both, IpMulticastTtl, libc::IPPROTO_IP, libc::IP_MULTICAST_TTL, u8);
 sockopt_impl!(Both, IpMulticastLoop, libc::IPPROTO_IP, libc::IP_MULTICAST_LOOP, bool);
+#[cfg(any(target_os = "android", target_os = "fuchsia", target_os = "linux"))]
+sockopt_impl!(Both, IpFreebind, libc::IPPROTO_IP, libc::IP_FREEBIND, bool);
 sockopt_impl!(Both, ReceiveTimeout, libc::SOL_SOCKET, libc::SO_RCVTIMEO, TimeVal);
 sockopt_impl!(Both, SendTimeout, libc::SOL_SOCKET, libc::SO_SNDTIMEO, TimeVal);
 sockopt_impl!(Both, Broadcast, libc::SOL_SOCKET, libc::SO_BROADCAST, bool);
@@ -259,6 +261,8 @@ sockopt_impl!(Both, TcpKeepIdle, libc::IPPROTO_TCP, libc::TCP_KEEPIDLE, u32);
 sockopt_impl!(Both, TcpKeepCount, libc::IPPROTO_TCP, libc::TCP_KEEPCNT, u32);
 #[cfg(not(target_os = "openbsd"))]
 sockopt_impl!(Both, TcpKeepInterval, libc::IPPROTO_TCP, libc::TCP_KEEPINTVL, u32);
+#[cfg(any(target_os = "fuchsia", target_os = "linux"))]
+sockopt_impl!(Both, TcpUserTimeout, libc::IPPROTO_TCP, libc::TCP_USER_TIMEOUT, u32);
 sockopt_impl!(Both, RcvBuf, libc::SOL_SOCKET, libc::SO_RCVBUF, usize);
 sockopt_impl!(Both, SndBuf, libc::SOL_SOCKET, libc::SO_SNDBUF, usize);
 #[cfg(any(target_os = "android", target_os = "linux"))]
@@ -324,6 +328,8 @@ sockopt_impl!(Both, Ipv4RecvDstAddr, libc::IPPROTO_IP, libc::IP_RECVDSTADDR, boo
 sockopt_impl!(Both, UdpGsoSegment, libc::SOL_UDP, libc::UDP_SEGMENT, libc::c_int);
 #[cfg(target_os = "linux")]
 sockopt_impl!(Both, UdpGroSegment, libc::IPPROTO_UDP, libc::UDP_GRO, bool);
+#[cfg(any(target_os = "android", target_os = "fuchsia", target_os = "linux"))]
+sockopt_impl!(Both, RxqOvfl, libc::SOL_SOCKET, libc::SO_RXQ_OVFL, libc::c_int);
 
 #[cfg(any(target_os = "android", target_os = "linux"))]
 #[derive(Copy, Clone, Debug)]
