@@ -519,7 +519,6 @@ mod recvfrom {
 // Test error handling of our recvmsg wrapper
 #[test]
 pub fn test_recvmsg_ebadf() {
-    use nix::Error;
     use nix::errno::Errno;
     use nix::sys::socket::{MsgFlags, recvmsg};
     use nix::sys::uio::IoVec;
@@ -528,7 +527,7 @@ pub fn test_recvmsg_ebadf() {
     let iov = [IoVec::from_mut_slice(&mut buf[..])];
     let fd = -1;    // Bad file descriptor
     let r = recvmsg(fd, &iov, None, MsgFlags::empty());
-    assert_eq!(r.err().unwrap(), Error::Sys(Errno::EBADF));
+    assert_eq!(r.err().unwrap(), Errno::EBADF);
 }
 
 // Disable the test on emulated platforms due to a bug in QEMU versions <
@@ -818,7 +817,6 @@ pub fn test_sendmsg_ipv4packetinfo() {
         target_os = "freebsd"))]
 #[test]
 pub fn test_sendmsg_ipv6packetinfo() {
-    use nix::Error;
     use nix::errno::Errno;
     use nix::sys::uio::IoVec;
     use nix::sys::socket::{socket, sendmsg, bind,
@@ -835,7 +833,7 @@ pub fn test_sendmsg_ipv6packetinfo() {
     let inet_addr = InetAddr::from_std(&std_sa);
     let sock_addr = SockAddr::new_inet(inet_addr);
 
-    if let Err(Error::Sys(Errno::EADDRNOTAVAIL)) = bind(sock, &sock_addr) {
+    if let Err(Errno::EADDRNOTAVAIL) = bind(sock, &sock_addr) {
         println!("IPv6 not available, skipping test.");
         return;
     }
@@ -1145,7 +1143,6 @@ pub fn test_unixdomain() {
 #[cfg(any(target_os = "macos", target_os = "ios"))]
 #[test]
 pub fn test_syscontrol() {
-    use nix::Error;
     use nix::errno::Errno;
     use nix::sys::socket::{socket, SockAddr, SockType, SockFlag, SockProtocol};
 
@@ -1153,7 +1150,7 @@ pub fn test_syscontrol() {
                     SockFlag::empty(), SockProtocol::KextControl)
              .expect("socket failed");
     let _sockaddr = SockAddr::new_sys_control(fd, "com.apple.net.utun_control", 0).expect("resolving sys_control name failed");
-    assert_eq!(SockAddr::new_sys_control(fd, "foo.bar.lol", 0).err(), Some(Error::Sys(Errno::ENOENT)));
+    assert_eq!(SockAddr::new_sys_control(fd, "foo.bar.lol", 0).err(), Some(Errno::ENOENT));
 
     // requires root privileges
     // connect(fd, &sockaddr).expect("connect failed");
@@ -1500,7 +1497,6 @@ pub fn test_recv_ipv6pktinfo() {
 #[test]
 pub fn test_vsock() {
     use libc;
-    use nix::Error;
     use nix::errno::Errno;
     use nix::sys::socket::{AddressFamily, socket, bind, connect, listen,
                            SockAddr, SockType, SockFlag};
@@ -1516,7 +1512,7 @@ pub fn test_vsock() {
     // VMADDR_CID_HYPERVISOR is reserved, so we expect an EADDRNOTAVAIL error.
     let sockaddr = SockAddr::new_vsock(libc::VMADDR_CID_HYPERVISOR, port);
     assert_eq!(bind(s1, &sockaddr).err(),
-               Some(Error::Sys(Errno::EADDRNOTAVAIL)));
+               Some(Errno::EADDRNOTAVAIL));
 
     let sockaddr = SockAddr::new_vsock(libc::VMADDR_CID_ANY, port);
     assert_eq!(bind(s1, &sockaddr), Ok(()));
@@ -1648,4 +1644,87 @@ fn test_recvmmsg_timestampns() {
     assert!(rduration <= time1.duration_since(UNIX_EPOCH).unwrap());
     // Close socket
     nix::unistd::close(in_socket).unwrap();
+}
+
+// Disable the test on emulated platforms because it fails in Cirrus-CI.  Lack of QEMU
+// support is suspected.
+#[cfg_attr(not(any(target_arch = "x86_64")), ignore)]
+#[cfg(any(target_os = "android", target_os = "fuchsia", target_os = "linux"))]
+#[test]
+fn test_recvmsg_rxq_ovfl() {
+    use nix::Error;
+    use nix::sys::socket::*;
+    use nix::sys::uio::IoVec;
+    use nix::sys::socket::sockopt::{RxqOvfl, RcvBuf};
+
+    let message = [0u8; 2048];
+    let bufsize = message.len() * 2;
+
+    let in_socket = socket(
+        AddressFamily::Inet,
+        SockType::Datagram,
+        SockFlag::empty(),
+        None).unwrap();
+    let out_socket = socket(
+        AddressFamily::Inet,
+        SockType::Datagram,
+        SockFlag::empty(),
+        None).unwrap();
+
+    let localhost = InetAddr::new(IpAddr::new_v4(127, 0, 0, 1), 0);
+    bind(in_socket, &SockAddr::new_inet(localhost)).unwrap();
+
+    let address = getsockname(in_socket).unwrap();
+    connect(out_socket, &address).unwrap();
+
+    // Set SO_RXQ_OVFL flag.
+    setsockopt(in_socket, RxqOvfl, &1).unwrap();
+
+    // Set the receiver buffer size to hold only 2 messages.
+    setsockopt(in_socket, RcvBuf, &bufsize).unwrap();
+
+    let mut drop_counter = 0;
+
+    for _ in 0..2 {
+        let iov = [IoVec::from_slice(&message)];
+        let flags = MsgFlags::empty();
+
+        // Send the 3 messages (the receiver buffer can only hold 2 messages)
+        // to create an overflow.
+        for _ in 0..3 {
+            let l = sendmsg(out_socket, &iov, &[], flags, Some(&address)).unwrap();
+            assert_eq!(message.len(), l);
+        }
+
+        // Receive the message and check the drop counter if any.
+        loop {
+            let mut buffer = vec![0u8; message.len()];
+            let mut cmsgspace = nix::cmsg_space!(u32);
+
+            let iov = [IoVec::from_mut_slice(&mut buffer)];
+
+            match recvmsg(
+                in_socket,
+                &iov,
+                Some(&mut cmsgspace),
+                MsgFlags::MSG_DONTWAIT) {
+                Ok(r) => {
+                    drop_counter = match r.cmsgs().next() {
+                        Some(ControlMessageOwned::RxqOvfl(drop_counter)) => drop_counter,
+                        Some(_) => panic!("Unexpected control message"),
+                        None => 0,
+                    };
+                },
+                Err(Error::EAGAIN) => { break; },
+                _ => { panic!("unknown recvmsg() error"); },
+            }
+        }
+    }
+
+    // One packet lost.
+    assert_eq!(drop_counter, 1);
+
+    // Close sockets
+    nix::unistd::close(in_socket).unwrap();
+    nix::unistd::close(out_socket).unwrap();
 }
