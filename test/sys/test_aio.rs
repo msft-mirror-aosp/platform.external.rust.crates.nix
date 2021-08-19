@@ -142,9 +142,7 @@ fn test_fsync_error() {
 }
 
 #[test]
-#[cfg_attr(all(target_env = "musl", target_arch = "x86_64"), ignore)]
-// On Travis, aio_suspend hits an assertion within glibc.  This is either a bug
-// in Travis's version of glibc or Linux.  Either way, we must skip the test.
+// On Cirrus on Linux, this test fails due to a glibc bug.
 // https://github.com/nix-rust/nix/issues/1099
 #[cfg_attr(target_os = "linux", ignore)]
 // On Cirrus, aio_suspend is failing with EINVAL
@@ -179,7 +177,7 @@ fn test_aio_suspend() {
             let cbbuf = [wcb.as_ref(), rcb.as_ref()];
             let r = aio_suspend(&cbbuf[..], Some(timeout));
             match r {
-                Err(Error::Sys(Errno::EINTR)) => continue,
+                Err(Errno::EINTR) => continue,
                 Err(e) => panic!("aio_suspend returned {:?}", e),
                 Ok(_) => ()
             };

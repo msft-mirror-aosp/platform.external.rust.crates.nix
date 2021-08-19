@@ -210,6 +210,43 @@ pub fn renameat<P1: ?Sized + NixPath, P2: ?Sized + NixPath>(
     Errno::result(res).map(drop)
 }
 
+#[cfg(all(
+    target_os = "linux",
+    target_env = "gnu",
+))]
+libc_bitflags! {
+    pub struct RenameFlags: u32 {
+        RENAME_EXCHANGE;
+        RENAME_NOREPLACE;
+        RENAME_WHITEOUT;
+    }
+}
+
+#[cfg(all(
+    target_os = "linux",
+    target_env = "gnu",
+))]
+pub fn renameat2<P1: ?Sized + NixPath, P2: ?Sized + NixPath>(
+    old_dirfd: Option<RawFd>,
+    old_path: &P1,
+    new_dirfd: Option<RawFd>,
+    new_path: &P2,
+    flags: RenameFlags,
+) -> Result<()> {
+    let res = old_path.with_nix_path(|old_cstr| {
+        new_path.with_nix_path(|new_cstr| unsafe {
+            libc::renameat2(
+                at_rawfd(old_dirfd),
+                old_cstr.as_ptr(),
+                at_rawfd(new_dirfd),
+                new_cstr.as_ptr(),
+                flags.bits(),
+            )
+        })
+    })??;
+    Errno::result(res).map(drop)
+}
+
 fn wrap_readlink_result(mut v: Vec<u8>, len: ssize_t) -> Result<OsString> {
     unsafe { v.set_len(len as usize) }
     v.shrink_to_fit();
@@ -288,7 +325,7 @@ fn inner_readlink<P: ?Sized + NixPath>(dirfd: Option<RawFd>, path: &P) -> Result
                 Some(next_size) => try_size = next_size,
                 // It's absurd that this would happen, but handle it sanely
                 // anyway.
-                None => break Err(super::Error::Sys(Errno::ENAMETOOLONG)),
+                None => break Err(super::Error::from(Errno::ENAMETOOLONG)),
             }
         }
     }
@@ -646,6 +683,6 @@ pub fn posix_fallocate(fd: RawFd, offset: libc::off_t, len: libc::off_t) -> Resu
     match Errno::result(res) {
         Err(err) => Err(err),
         Ok(0) => Ok(()),
-        Ok(errno) => Err(crate::Error::Sys(Errno::from_i32(errno))),
+        Ok(errno) => Err(crate::Error::from(Errno::from_i32(errno))),
     }
 }
