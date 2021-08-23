@@ -1,11 +1,20 @@
 #[cfg(not(target_os = "redox"))]
-use nix::Error;
-#[cfg(not(target_os = "redox"))]
 use nix::errno::*;
 #[cfg(not(target_os = "redox"))]
 use nix::fcntl::{open, OFlag, readlink};
 #[cfg(not(target_os = "redox"))]
 use nix::fcntl::{openat, readlinkat, renameat};
+#[cfg(all(
+    target_os = "linux",
+    target_env = "gnu",
+    any(
+        target_arch = "x86_64",
+        target_arch = "x32",
+        target_arch = "powerpc",
+        target_arch = "s390x"
+    )
+))]
+use nix::fcntl::{RenameFlags, renameat2};
 #[cfg(not(target_os = "redox"))]
 use nix::sys::stat::Mode;
 #[cfg(not(target_os = "redox"))]
@@ -55,11 +64,137 @@ fn test_renameat() {
     let new_dirfd = open(new_dir.path(), OFlag::empty(), Mode::empty()).unwrap();
     renameat(Some(old_dirfd), "old", Some(new_dirfd), "new").unwrap();
     assert_eq!(renameat(Some(old_dirfd), "old", Some(new_dirfd), "new").unwrap_err(),
-               Error::Sys(Errno::ENOENT));
+               Errno::ENOENT);
     close(old_dirfd).unwrap();
     close(new_dirfd).unwrap();
     assert!(new_dir.path().join("new").exists());
 }
+
+#[test]
+#[cfg(all(
+    target_os = "linux",
+    target_env = "gnu",
+    any(
+        target_arch = "x86_64",
+        target_arch = "x32",
+        target_arch = "powerpc",
+        target_arch = "s390x"
+    )
+))]
+fn test_renameat2_behaves_like_renameat_with_no_flags() {
+    let old_dir = tempfile::tempdir().unwrap();
+    let old_dirfd = open(old_dir.path(), OFlag::empty(), Mode::empty()).unwrap();
+    let old_path = old_dir.path().join("old");
+    File::create(&old_path).unwrap();
+    let new_dir = tempfile::tempdir().unwrap();
+    let new_dirfd = open(new_dir.path(), OFlag::empty(), Mode::empty()).unwrap();
+    renameat2(
+        Some(old_dirfd),
+        "old",
+        Some(new_dirfd),
+        "new",
+        RenameFlags::empty(),
+    )
+    .unwrap();
+    assert_eq!(
+        renameat2(
+            Some(old_dirfd),
+            "old",
+            Some(new_dirfd),
+            "new",
+            RenameFlags::empty()
+        )
+        .unwrap_err(),
+        Errno::ENOENT
+    );
+    close(old_dirfd).unwrap();
+    close(new_dirfd).unwrap();
+    assert!(new_dir.path().join("new").exists());
+}
+
+#[test]
+#[cfg(all(
+    target_os = "linux",
+    target_env = "gnu",
+    any(
+        target_arch = "x86_64",
+        target_arch = "x32",
+        target_arch = "powerpc",
+        target_arch = "s390x"
+    )
+))]
+fn test_renameat2_exchange() {
+    let old_dir = tempfile::tempdir().unwrap();
+    let old_dirfd = open(old_dir.path(), OFlag::empty(), Mode::empty()).unwrap();
+    let old_path = old_dir.path().join("old");
+    {
+        let mut old_f = File::create(&old_path).unwrap();
+        old_f.write(b"old").unwrap();
+    }
+    let new_dir = tempfile::tempdir().unwrap();
+    let new_dirfd = open(new_dir.path(), OFlag::empty(), Mode::empty()).unwrap();
+    let new_path = new_dir.path().join("new");
+    {
+        let mut new_f = File::create(&new_path).unwrap();
+        new_f.write(b"new").unwrap();
+    }
+    renameat2(
+        Some(old_dirfd),
+        "old",
+        Some(new_dirfd),
+        "new",
+        RenameFlags::RENAME_EXCHANGE,
+    )
+    .unwrap();
+    let mut buf = String::new();
+    let mut new_f = File::open(&new_path).unwrap();
+    new_f.read_to_string(&mut buf).unwrap();
+    assert_eq!(buf, "old");
+    buf = "".to_string();
+    let mut old_f = File::open(&old_path).unwrap();
+    old_f.read_to_string(&mut buf).unwrap();
+    assert_eq!(buf, "new");
+    close(old_dirfd).unwrap();
+    close(new_dirfd).unwrap();
+}
+
+#[test]
+#[cfg(all(
+    target_os = "linux",
+    target_env = "gnu",
+    any(
+        target_arch = "x86_64",
+        target_arch = "x32",
+        target_arch = "powerpc",
+        target_arch = "s390x"
+    )
+))]
+fn test_renameat2_noreplace() {
+    let old_dir = tempfile::tempdir().unwrap();
+    let old_dirfd = open(old_dir.path(), OFlag::empty(), Mode::empty()).unwrap();
+    let old_path = old_dir.path().join("old");
+    File::create(&old_path).unwrap();
+    let new_dir = tempfile::tempdir().unwrap();
+    let new_dirfd = open(new_dir.path(), OFlag::empty(), Mode::empty()).unwrap();
+    let new_path = new_dir.path().join("new");
+    File::create(&new_path).unwrap();
+    assert_eq!(
+        renameat2(
+            Some(old_dirfd),
+            "old",
+            Some(new_dirfd),
+            "new",
+            RenameFlags::RENAME_NOREPLACE
+        )
+        .unwrap_err(),
+        Errno::EEXIST
+    );
+    close(old_dirfd).unwrap();
+    close(new_dirfd).unwrap();
+    assert!(new_dir.path().join("new").exists());
+    assert!(old_dir.path().join("old").exists());
+}
+
 
 #[test]
 #[cfg(not(target_os = "redox"))]
@@ -102,11 +237,15 @@ mod linux_android {
     /// resulting file is read and should contain the contents `bar`.
     /// The from_offset should be updated by the call to reflect
     /// the 3 bytes read (6).
-    ///
-    /// FIXME: This test is disabled for linux based builds, because Travis
-    /// Linux version is too old for `copy_file_range`.
     #[test]
-    #[ignore]
+    // QEMU does not support copy_file_range. Skip platforms that use QEMU in CI
+    #[cfg_attr(all(target_os = "linux", any(
+            target_arch = "aarch64",
+            target_arch = "arm",
+            target_arch = "mips",
+            target_arch = "mips64",
+            target_arch = "powerpc64"
+    )), ignore)]
     fn test_copy_file_range() {
         const CONTENTS: &[u8] = b"foobarbaz";
 
@@ -381,7 +520,7 @@ mod test_posix_fallocate {
                 assert_eq!(tmp.read(&mut data).expect("read failure"), LEN);
                 assert_eq!(&data[..], &[0u8; LEN][..]);
             }
-            Err(nix::Error::Sys(Errno::EINVAL)) => {
+            Err(Errno::EINVAL) => {
                 // POSIX requires posix_fallocate to return EINVAL both for
                 // invalid arguments (i.e. len < 0) and if the operation is not
                 // supported by the file system.
@@ -397,12 +536,8 @@ mod test_posix_fallocate {
     fn errno() {
         let (rd, _wr) = pipe().unwrap();
         let err = posix_fallocate(rd as RawFd, 0, 100).unwrap_err();
-        use nix::Error::Sys;
         match err {
-            Sys(Errno::EINVAL)
-                | Sys(Errno::ENODEV)
-                | Sys(Errno::ESPIPE)
-                | Sys(Errno::EBADF) => (),
+            Errno::EINVAL | Errno::ENODEV | Errno::ESPIPE | Errno::EBADF => (),
             errno =>
                 panic!(
                     "unexpected errno {}",

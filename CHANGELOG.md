@@ -9,6 +9,34 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 ### Fixed
 ### Removed
 
+## [0.22.0] - 9 July 2021
+### Added
+- Added `if_nameindex` (#[1445](https://github.com/nix-rust/nix/pull/1445))
+- Added `nmount` for FreeBSD.
+  (#[1453](https://github.com/nix-rust/nix/pull/1453))
+- Added `IpFreebind` socket option (sockopt) on Linux, Fuchsia and Android.
+  (#[1456](https://github.com/nix-rust/nix/pull/1456))
+- Added `TcpUserTimeout` socket option (sockopt) on Linux and Fuchsia.
+  (#[1457](https://github.com/nix-rust/nix/pull/1457))
+- Added `renameat2` for Linux
+  (#[1458](https://github.com/nix-rust/nix/pull/1458))
+- Added `RxqOvfl` support on Linux, Fuchsia and Android.
+  (#[1455](https://github.com/nix-rust/nix/pull/1455))
+
+### Changed
+- `ptsname_r` now returns a lossily-converted string in the event of bad UTF,
+  just like `ptsname`.
+  ([#1446](https://github.com/nix-rust/nix/pull/1446))
+- Nix's error type is now a simple wrapper around the platform's Errno.  This
+  means it is now `Into<std::io::Error>`.  It's also `Clone`, `Copy`, `Eq`, and
+  has a small fixed size.  It also requires less typing.  For example, the old
+  enum variant `nix::Error::Sys(nix::errno::Errno::EINVAL)` is now simply
+  `nix::Error::EINVAL`.
+  ([#1446](https://github.com/nix-rust/nix/pull/1446))
+
+### Fixed
+### Removed
+
 ## [0.21.0] - 31 May 2021
 ### Added
 - Added `getresuid` and `getresgid`
@@ -38,12 +66,17 @@ This project adheres to [Semantic Versioning](https://semver.org/).
   (#[1440](https://github.com/nix-rust/nix/pull/1440))
 - Minimum supported Rust version is now 1.41.0.
   ([#1440](https://github.com/nix-rust/nix/pull/1440))
+- Errno aliases are now associated consts on `Errno`, instead of consts in the
+  `errno` module.
+  (#[1452](https://github.com/nix-rust/nix/pull/1452))
 
 ### Fixed
 - Allow `sockaddr_ll` size, as reported by the Linux kernel, to be smaller then it's definition
   (#[1395](https://github.com/nix-rust/nix/pull/1395))
 - Fix spurious errors using `sendmmsg` with multiple cmsgs
   (#[1414](https://github.com/nix-rust/nix/pull/1414))
+- Added `Errno::EOPNOTSUPP` to FreeBSD, where it was missing.
+  (#[1452](https://github.com/nix-rust/nix/pull/1452))
 
 ### Removed
 
@@ -55,6 +88,8 @@ This project adheres to [Semantic Versioning](https://semver.org/).
   longer be needed now that async/await are available.  `AioCb`s now work
   exclusively with borrowed buffers, not owned ones.
   (#[1440](https://github.com/nix-rust/nix/pull/1440))
+- Removed some Errno values from platforms where they aren't actually defined.
+  (#[1452](https://github.com/nix-rust/nix/pull/1452))
 
 ## [0.20.0] - 20 February 2021
 ### Added
