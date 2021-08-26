@@ -17,6 +17,12 @@
       "name": "keystore2_test"
     },
     {
+      "name": "legacykeystore_test"
+    },
+    {
+      "name": "microdroid_manager_test"
+    },
+    {
       "name": "tokio_device_test_tests__require_full"
     },
     {
@@ -212,7 +218,7 @@
       "name": "tokio_device_test_tests_uds_split"
     },
     {
-      "name": "legacykeystore_test"
+      "name": "virtualizationservice_device_test"
     }
   ]
 }
