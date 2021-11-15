@@ -5,6 +5,7 @@
     "com.android.virt"
   ],
   "dependencies": true,
+  "vendor_available": true,
   "device": true,
   "run": true
 }
