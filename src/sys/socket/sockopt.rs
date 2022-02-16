@@ -214,7 +214,6 @@ macro_rules! sockopt_impl {
  */
 
 sockopt_impl!(Both, ReuseAddr, libc::SOL_SOCKET, libc::SO_REUSEADDR, bool);
-#[cfg(not(any(target_os = "illumos", target_os = "solaris")))]
 sockopt_impl!(Both, ReusePort, libc::SOL_SOCKET, libc::SO_REUSEPORT, bool);
 sockopt_impl!(Both, TcpNoDelay, libc::IPPROTO_TCP, libc::TCP_NODELAY, bool);
 sockopt_impl!(Both, Linger, libc::SOL_SOCKET, libc::SO_LINGER, libc::linger);
@@ -226,20 +225,16 @@ cfg_if! {
         sockopt_impl!(SetOnly, Ipv6DropMembership, libc::IPPROTO_IPV6, libc::IPV6_DROP_MEMBERSHIP, super::Ipv6MembershipRequest);
     } else if #[cfg(any(target_os = "dragonfly",
                         target_os = "freebsd",
-                        target_os = "illumos",
                         target_os = "ios",
                         target_os = "macos",
                         target_os = "netbsd",
-                        target_os = "openbsd",
-                        target_os = "solaris"))] {
+                        target_os = "openbsd"))] {
         sockopt_impl!(SetOnly, Ipv6AddMembership, libc::IPPROTO_IPV6, libc::IPV6_JOIN_GROUP, super::Ipv6MembershipRequest);
         sockopt_impl!(SetOnly, Ipv6DropMembership, libc::IPPROTO_IPV6, libc::IPV6_LEAVE_GROUP, super::Ipv6MembershipRequest);
     }
 }
 sockopt_impl!(Both, IpMulticastTtl, libc::IPPROTO_IP, libc::IP_MULTICAST_TTL, u8);
 sockopt_impl!(Both, IpMulticastLoop, libc::IPPROTO_IP, libc::IP_MULTICAST_LOOP, bool);
-#[cfg(any(target_os = "android", target_os = "fuchsia", target_os = "linux"))]
-sockopt_impl!(Both, IpFreebind, libc::IPPROTO_IP, libc::IP_FREEBIND, bool);
 sockopt_impl!(Both, ReceiveTimeout, libc::SOL_SOCKET, libc::SO_RCVTIMEO, TimeVal);
 sockopt_impl!(Both, SendTimeout, libc::SOL_SOCKET, libc::SO_SNDTIMEO, TimeVal);
 sockopt_impl!(Both, Broadcast, libc::SOL_SOCKET, libc::SO_BROADCAST, bool);
@@ -261,8 +256,6 @@ sockopt_impl!(Both, TcpKeepIdle, libc::IPPROTO_TCP, libc::TCP_KEEPIDLE, u32);
 sockopt_impl!(Both, TcpKeepCount, libc::IPPROTO_TCP, libc::TCP_KEEPCNT, u32);
 #[cfg(not(target_os = "openbsd"))]
 sockopt_impl!(Both, TcpKeepInterval, libc::IPPROTO_TCP, libc::TCP_KEEPINTVL, u32);
-#[cfg(any(target_os = "fuchsia", target_os = "linux"))]
-sockopt_impl!(Both, TcpUserTimeout, libc::IPPROTO_TCP, libc::TCP_USER_TIMEOUT, u32);
 sockopt_impl!(Both, RcvBuf, libc::SOL_SOCKET, libc::SO_RCVBUF, usize);
 sockopt_impl!(Both, SndBuf, libc::SOL_SOCKET, libc::SO_SNDBUF, usize);
 #[cfg(any(target_os = "android", target_os = "linux"))]
@@ -276,8 +269,6 @@ sockopt_impl!(Both, BindToDevice, libc::SOL_SOCKET, libc::SO_BINDTODEVICE, OsStr
 #[cfg(any(target_os = "android", target_os = "linux"))]
 sockopt_impl!(GetOnly, OriginalDst, libc::SOL_IP, libc::SO_ORIGINAL_DST, libc::sockaddr_in);
 sockopt_impl!(Both, ReceiveTimestamp, libc::SOL_SOCKET, libc::SO_TIMESTAMP, bool);
-#[cfg(all(target_os = "linux"))]
-sockopt_impl!(Both, ReceiveTimestampns, libc::SOL_SOCKET, libc::SO_TIMESTAMPNS, bool);
 #[cfg(any(target_os = "android", target_os = "linux"))]
 sockopt_impl!(Both, IpTransparent, libc::SOL_IP, libc::IP_TRANSPARENT, bool);
 #[cfg(target_os = "openbsd")]
@@ -328,8 +319,6 @@ sockopt_impl!(Both, Ipv4RecvDstAddr, libc::IPPROTO_IP, libc::IP_RECVDSTADDR, boo
 sockopt_impl!(Both, UdpGsoSegment, libc::SOL_UDP, libc::UDP_SEGMENT, libc::c_int);
 #[cfg(target_os = "linux")]
 sockopt_impl!(Both, UdpGroSegment, libc::IPPROTO_UDP, libc::UDP_GRO, bool);
-#[cfg(any(target_os = "android", target_os = "fuchsia", target_os = "linux"))]
-sockopt_impl!(Both, RxqOvfl, libc::SOL_SOCKET, libc::SO_RXQ_OVFL, libc::c_int);
 
 #[cfg(any(target_os = "android", target_os = "linux"))]
 #[derive(Copy, Clone, Debug)]

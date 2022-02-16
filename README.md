@@ -1,7 +1,7 @@
 # Rust bindings to *nix APIs
 
 [![Cirrus Build Status](https://api.cirrus-ci.com/github/nix-rust/nix.svg)](https://cirrus-ci.com/github/nix-rust/nix)
-[![crates.io](https://meritbadge.herokuapp.com/nix)](https://crates.io/crates/nix)
+[![crates.io](http://meritbadge.herokuapp.com/nix)](https://crates.io/crates/nix)
 
 [Documentation (Releases)](https://docs.rs/nix/)
 
@@ -17,7 +17,7 @@ usage.
 
 As an example of what Nix provides, examine the differences between what is
 exposed by libc and nix for the
-[gethostname](https://man7.org/linux/man-pages/man2/gethostname.2.html) system
+[gethostname](http://man7.org/linux/man-pages/man2/gethostname.2.html) system
 call:
 
 ```rust,ignore
@@ -87,13 +87,13 @@ Tier 3:
 
 ## Usage
 
-`nix` requires Rust 1.41.0 or newer.
+`nix` requires Rust 1.40.0 or newer.
 
 To use `nix`, add this to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-nix = "0.22.1"
+nix = "0.20.0"
 ```
 
 ## Contributing
