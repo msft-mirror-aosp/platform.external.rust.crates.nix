@@ -20,7 +20,7 @@ fn is_so_mark_functional() {
 fn test_so_buf() {
     let fd = socket(AddressFamily::Inet, SockType::Datagram, SockFlag::empty(), SockProtocol::Udp)
              .unwrap();
-    let bufsize: usize = thread_rng().gen_range(4096..131_072);
+    let bufsize: usize = thread_rng().gen_range(4096, 131_072);
     setsockopt(fd, sockopt::SndBuf, &bufsize).unwrap();
     let actual = getsockopt(fd, sockopt::SndBuf).unwrap();
     assert!(actual >= bufsize);
@@ -74,7 +74,7 @@ fn test_bindtodevice() {
 fn test_so_tcp_keepalive() {
     let fd = socket(AddressFamily::Inet, SockType::Stream, SockFlag::empty(), SockProtocol::Tcp).unwrap();
     setsockopt(fd, sockopt::KeepAlive, &true).unwrap();
-    assert!(getsockopt(fd, sockopt::KeepAlive).unwrap());
+    assert_eq!(getsockopt(fd, sockopt::KeepAlive).unwrap(), true);
 
     #[cfg(any(target_os = "android",
               target_os = "dragonfly",

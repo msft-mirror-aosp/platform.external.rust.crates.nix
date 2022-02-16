@@ -3,7 +3,7 @@
 //! Timer FD is a Linux-only API to create timers and get expiration
 //! notifications through file descriptors.
 //!
-//! For more documentation, please read [timerfd_create(2)](https://man7.org/linux/man-pages/man2/timerfd_create.2.html).
+//! For more documentation, please read [timerfd_create(2)](http://man7.org/linux/man-pages/man2/timerfd_create.2.html).
 //!
 //! # Examples
 //!
@@ -30,7 +30,7 @@
 //! ```
 use crate::sys::time::TimeSpec;
 use crate::unistd::read;
-use crate::{errno::Errno, Result};
+use crate::{errno::Errno, Error, Result};
 use bitflags::bitflags;
 use libc::c_int;
 use std::os::unix::io::{AsRawFd, FromRawFd, RawFd};
@@ -56,7 +56,7 @@ impl FromRawFd for TimerFd {
 
 libc_enum! {
     /// The type of the clock used to mark the progress of the timer. For more
-    /// details on each kind of clock, please refer to [timerfd_create(2)](https://man7.org/linux/man-pages/man2/timerfd_create.2.html).
+    /// details on each kind of clock, please refer to [timerfd_create(2)](http://man7.org/linux/man-pages/man2/timerfd_create.2.html).
     #[repr(i32)]
     pub enum ClockId {
         CLOCK_REALTIME,
@@ -259,7 +259,7 @@ impl TimerFd {
         loop {
             if let Err(e) = read(self.fd, &mut [0u8; 8]) {
                 match e {
-                    Errno::EINTR => continue,
+                    Error::Sys(Errno::EINTR) => continue,
                     _ => return Err(e),
                 }
             } else {
@@ -277,7 +277,7 @@ impl Drop for TimerFd {
             let result = Errno::result(unsafe {
                 libc::close(self.fd)
             });
-            if let Err(Errno::EBADF) = result {
+            if let Err(Error::Sys(Errno::EBADF)) = result {
                 panic!("close of TimerFd encountered EBADF");
             }
         }
