@@ -46,7 +46,7 @@ pub const SIGNALFD_SIGINFO_SIZE: usize = 128;
 /// A signal must be blocked on every thread in a process, otherwise it won't be visible from
 /// signalfd (the default handler will be invoked instead).
 ///
-/// See [the signalfd man page for more information](https://man7.org/linux/man-pages/man2/signalfd.2.html)
+/// See [the signalfd man page for more information](http://man7.org/linux/man-pages/man2/signalfd.2.html)
 pub fn signalfd(fd: RawFd, mask: &SigSet, flags: SfdFlags) -> Result<RawFd> {
     unsafe {
         Errno::result(libc::signalfd(fd as libc::c_int, mask.as_ref(), flags.bits()))
@@ -108,7 +108,7 @@ impl SignalFd {
         match res {
             Ok(SIGNALFD_SIGINFO_SIZE) => Ok(Some(unsafe { mem::transmute(buffer.assume_init()) })),
             Ok(_) => unreachable!("partial read on signalfd"),
-            Err(Errno::EAGAIN) => Ok(None),
+            Err(Error::Sys(Errno::EAGAIN)) => Ok(None),
             Err(error) => Err(error)
         }
     }
@@ -117,7 +117,7 @@ impl SignalFd {
 impl Drop for SignalFd {
     fn drop(&mut self) {
         let e = unistd::close(self.0);
-        if !std::thread::panicking() && e == Err(Error::from(Errno::EBADF)) {
+        if !std::thread::panicking() && e == Err(Error::Sys(Errno::EBADF)) {
             panic!("Closing an invalid file descriptor!");
         };
     }
