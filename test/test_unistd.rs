@@ -1,6 +1,6 @@
 #[cfg(not(target_os = "redox"))]
 use nix::fcntl::{self, open, readlink};
-use nix::fcntl::OFlag;
+use nix::fcntl::{fcntl, FcntlArg, FdFlag, OFlag};
 use nix::unistd::*;
 use nix::unistd::ForkResult::*;
 #[cfg(not(target_os = "redox"))]
@@ -10,18 +10,20 @@ use nix::sys::stat::{self, Mode, SFlag};
 #[cfg(not(any(target_os = "redox", target_os = "fuchsia")))]
 use nix::pty::{posix_openpt, grantpt, unlockpt, ptsname};
 use nix::errno::Errno;
+#[cfg(not(target_os = "redox"))]
+use nix::Error;
 use std::{env, iter};
-#[cfg(not(any(target_os = "fuchsia", target_os = "redox")))]
+#[cfg(not(target_os = "redox"))]
 use std::ffi::CString;
 #[cfg(not(target_os = "redox"))]
 use std::fs::DirBuilder;
 use std::fs::{self, File};
 use std::io::Write;
 use std::os::unix::prelude::*;
-#[cfg(not(any(target_os = "fuchsia", target_os = "redox")))]
+#[cfg(not(target_os = "redox"))]
 use std::path::Path;
 use tempfile::{tempdir, tempfile};
-use libc::{_exit, mode_t, off_t};
+use libc::{_exit, off_t};
 
 use crate::*;
 
@@ -100,7 +102,7 @@ fn test_mkfifo() {
     mkfifo(&mkfifo_fifo, Mode::S_IRUSR).unwrap();
 
     let stats = stat::stat(&mkfifo_fifo).unwrap();
-    let typ = stat::SFlag::from_bits_truncate(stats.st_mode as mode_t);
+    let typ = stat::SFlag::from_bits_truncate(stats.st_mode);
     assert!(typ == SFlag::S_IFIFO);
 }
 
@@ -133,8 +135,6 @@ fn test_mkfifoat_none() {
     target_os = "macos", target_os = "ios",
     target_os = "android", target_os = "redox")))]
 fn test_mkfifoat() {
-    use nix::fcntl;
-
     let tempdir = tempdir().unwrap();
     let dirfd = open(tempdir.path(), OFlag::empty(), Mode::empty()).unwrap();
     let mkfifoat_name = "mkfifoat_name";
@@ -224,11 +224,7 @@ fn test_setgroups() {
 
 #[test]
 // `getgroups()` and `setgroups()` do not behave as expected on Apple platforms
-#[cfg(not(any(target_os = "ios",
-              target_os = "macos",
-              target_os = "redox",
-              target_os = "fuchsia",
-              target_os = "illumos")))]
+#[cfg(not(any(target_os = "ios", target_os = "macos", target_os = "redox", target_os = "fuchsia")))]
 fn test_initgroups() {
     // Skip this test when not run as root as `initgroups()` and `setgroups()`
     // require root.
@@ -258,7 +254,7 @@ fn test_initgroups() {
     setgroups(&old_groups).unwrap();
 }
 
-#[cfg(not(any(target_os = "fuchsia", target_os = "redox")))]
+#[cfg(not(target_os = "redox"))]
 macro_rules! execve_test_factory(
     ($test_name:ident, $syscall:ident, $exe: expr $(, $pathname:expr, $flags:expr)*) => (
 
@@ -370,12 +366,10 @@ cfg_if!{
         execve_test_factory!(test_execve, execve, CString::new("/bin/sh").unwrap().as_c_str());
         execve_test_factory!(test_fexecve, fexecve, File::open("/bin/sh").unwrap().into_raw_fd());
     } else if #[cfg(any(target_os = "dragonfly",
-                        target_os = "illumos",
                         target_os = "ios",
                         target_os = "macos",
                         target_os = "netbsd",
-                        target_os = "openbsd",
-                        target_os = "solaris"))] {
+                        target_os = "openbsd"))] {
         execve_test_factory!(test_execve, execve, CString::new("/bin/sh").unwrap().as_c_str());
         // No fexecve() on DragonFly, ios, macos, NetBSD, OpenBSD.
         //
@@ -441,7 +435,7 @@ fn test_getcwd() {
     // kicks in.  Note: One path cannot be longer than 255 bytes
     // (NAME_MAX) whole path cannot be longer than PATH_MAX (usually
     // 4096 on linux, 1024 on macos)
-    let mut inner_tmp_dir = tmpdir_path;
+    let mut inner_tmp_dir = tmpdir_path.to_path_buf();
     for _ in 0..5 {
         let newdir = iter::repeat("a").take(100).collect::<String>();
         inner_tmp_dir.push(newdir);
@@ -624,34 +618,15 @@ fn test_sysconf_unsupported() {
     assert!(open_max.expect("sysconf failed").is_none())
 }
 
-
-#[cfg(any(target_os = "android", target_os = "linux"))]
-#[test]
-fn test_getresuid() {
-    let resuids = getresuid().unwrap();
-    assert!(resuids.real.as_raw() != libc::uid_t::max_value());
-    assert!(resuids.effective.as_raw() != libc::uid_t::max_value());
-    assert!(resuids.saved.as_raw() != libc::uid_t::max_value());
-}
-
-#[cfg(any(target_os = "android", target_os = "linux"))]
-#[test]
-fn test_getresgid() {
-    let resgids = getresgid().unwrap();
-    assert!(resgids.real.as_raw() != libc::gid_t::max_value());
-    assert!(resgids.effective.as_raw() != libc::gid_t::max_value());
-    assert!(resgids.saved.as_raw() != libc::gid_t::max_value());
-}
-
 // Test that we can create a pair of pipes.  No need to verify that they pass
 // data; that's the domain of the OS, not nix.
 #[test]
 fn test_pipe() {
     let (fd0, fd1) = pipe().unwrap();
-    let m0 = stat::SFlag::from_bits_truncate(stat::fstat(fd0).unwrap().st_mode as mode_t);
+    let m0 = stat::SFlag::from_bits_truncate(stat::fstat(fd0).unwrap().st_mode);
     // S_IFIFO means it's a pipe
     assert_eq!(m0, SFlag::S_IFIFO);
-    let m1 = stat::SFlag::from_bits_truncate(stat::fstat(fd1).unwrap().st_mode as mode_t);
+    let m1 = stat::SFlag::from_bits_truncate(stat::fstat(fd1).unwrap().st_mode);
     assert_eq!(m1, SFlag::S_IFIFO);
 }
 
@@ -661,16 +636,12 @@ fn test_pipe() {
           target_os = "dragonfly",
           target_os = "emscripten",
           target_os = "freebsd",
-          target_os = "illumos",
           target_os = "linux",
           target_os = "netbsd",
           target_os = "openbsd",
-          target_os = "redox",
-          target_os = "solaris"))]
+          target_os = "redox"))]
 #[test]
 fn test_pipe2() {
-    use nix::fcntl::{fcntl, FcntlArg, FdFlag};
-
     let (fd0, fd1) = pipe2(OFlag::O_CLOEXEC).unwrap();
     let f0 = FdFlag::from_bits_truncate(fcntl(fd0, FcntlArg::F_GETFD).unwrap());
     assert!(f0.contains(FdFlag::FD_CLOEXEC));
@@ -750,7 +721,7 @@ fn test_alarm() {
     // Overwriting an alarm should return the old alarm.
     assert_eq!(alarm::set(1), Some(60));
 
-    // We should be woken up after 1 second by the alarm, so we'll sleep for 3
+    // We should be woken up after 1 second by the alarm, so we'll sleep for 2
     // seconds to be sure.
     let starttime = Instant::now();
     loop {
@@ -947,9 +918,7 @@ fn test_linkat_follow_symlink() {
     let newfilestat = stat::stat(&newfilepath).unwrap();
 
     // Check the file type of the new link
-    assert_eq!((stat::SFlag::from_bits_truncate(newfilestat.st_mode as mode_t) & SFlag::S_IFMT),
-        SFlag::S_IFREG
-    );
+    assert!((stat::SFlag::from_bits_truncate(newfilestat.st_mode) & SFlag::S_IFMT) ==  SFlag::S_IFREG);
 
     // Check the number of hard links to the original file
     assert_eq!(newfilestat.st_nlink, 2);
@@ -970,7 +939,7 @@ fn test_unlinkat_dir_noremovedir() {
 
     // Attempt unlink dir at relative path without proper flag
     let err_result = unlinkat(Some(dirfd), dirname, UnlinkatFlags::NoRemoveDir).unwrap_err();
-    assert!(err_result == Errno::EISDIR || err_result == Errno::EPERM);
+    assert!(err_result == Error::Sys(Errno::EISDIR) || err_result == Error::Sys(Errno::EPERM));
  }
 
 #[test]
@@ -1013,7 +982,7 @@ fn test_unlinkat_file() {
 fn test_access_not_existing() {
     let tempdir = tempdir().unwrap();
     let dir = tempdir.path().join("does_not_exist.txt");
-    assert_eq!(access(&dir, AccessFlags::F_OK).err().unwrap(),
+    assert_eq!(access(&dir, AccessFlags::F_OK).err().unwrap().as_errno().unwrap(),
                Errno::ENOENT);
 }
 
@@ -1092,13 +1061,13 @@ fn test_ttyname() {
 fn test_ttyname_not_pty() {
     let fd = File::open("/dev/zero").unwrap();
     assert!(fd.as_raw_fd() > 0);
-    assert_eq!(ttyname(fd.as_raw_fd()), Err(Errno::ENOTTY));
+    assert_eq!(ttyname(fd.as_raw_fd()), Err(Error::Sys(Errno::ENOTTY)));
 }
 
 #[test]
 #[cfg(not(any(target_os = "redox", target_os = "fuchsia")))]
 fn test_ttyname_invalid_fd() {
-    assert_eq!(ttyname(-1), Err(Errno::EBADF));
+    assert_eq!(ttyname(-1), Err(Error::Sys(Errno::EBADF)));
 }
 
 #[test]
