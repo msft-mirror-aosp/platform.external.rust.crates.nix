@@ -38,7 +38,6 @@ libc_bitflags!(
         MS_KERNMOUNT;
         MS_I_VERSION;
         MS_STRICTATIME;
-        MS_LAZYTIME;
         MS_ACTIVE;
         MS_NOUSER;
         MS_RMT_MASK;

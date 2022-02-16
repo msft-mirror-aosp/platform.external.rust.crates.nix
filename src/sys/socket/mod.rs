@@ -1,15 +1,12 @@
 //! Socket interface functions
 //!
-//! [Further reading](https://man7.org/linux/man-pages/man7/socket.7.html)
+//! [Further reading](http://man7.org/linux/man-pages/man7/socket.7.html)
 use cfg_if::cfg_if;
 use crate::{Error, Result, errno::Errno};
 use libc::{self, c_void, c_int, iovec, socklen_t, size_t,
         CMSG_FIRSTHDR, CMSG_NXTHDR, CMSG_DATA, CMSG_LEN};
-use memoffset::offset_of;
 use std::{mem, ptr, slice};
 use std::os::unix::io::RawFd;
-#[cfg(all(target_os = "linux"))]
-use crate::sys::time::TimeSpec;
 use crate::sys::time::TimeVal;
 use crate::sys::uio::IoVec;
 
@@ -22,7 +19,6 @@ pub mod sockopt;
  *
  */
 
-#[cfg(not(any(target_os = "illumos", target_os = "solaris")))]
 pub use self::addr::{
     AddressFamily,
     SockAddr,
@@ -33,17 +29,6 @@ pub use self::addr::{
     Ipv6Addr,
     LinkAddr,
 };
-#[cfg(any(target_os = "illumos", target_os = "solaris"))]
-pub use self::addr::{
-    AddressFamily,
-    SockAddr,
-    InetAddr,
-    UnixAddr,
-    IpAddr,
-    Ipv4Addr,
-    Ipv6Addr,
-};
-
 #[cfg(any(target_os = "android", target_os = "linux"))]
 pub use crate::sys::socket::addr::netlink::NetlinkAddr;
 #[cfg(any(target_os = "android", target_os = "linux"))]
@@ -95,9 +80,9 @@ pub enum SockType {
 #[repr(i32)]
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum SockProtocol {
-    /// TCP protocol ([ip(7)](https://man7.org/linux/man-pages/man7/ip.7.html))
+    /// TCP protocol ([ip(7)](http://man7.org/linux/man-pages/man7/ip.7.html))
     Tcp = libc::IPPROTO_TCP,
-    /// UDP protocol ([ip(7)](https://man7.org/linux/man-pages/man7/ip.7.html))
+    /// UDP protocol ([ip(7)](http://man7.org/linux/man-pages/man7/ip.7.html))
     Udp = libc::IPPROTO_UDP,
     /// Allows applications and other KEXTs to be notified when certain kernel events occur
     /// ([ref](https://developer.apple.com/library/content/documentation/Darwin/Conceptual/NKEConceptual/control/control.html))
@@ -174,7 +159,6 @@ libc_bitflags!{
         #[cfg(any(target_os = "android",
                   target_os = "dragonfly",
                   target_os = "freebsd",
-                  target_os = "illumos",
                   target_os = "linux",
                   target_os = "netbsd",
                   target_os = "openbsd"))]
@@ -183,7 +167,6 @@ libc_bitflags!{
         #[cfg(any(target_os = "android",
                   target_os = "dragonfly",
                   target_os = "freebsd",
-                  target_os = "illumos",
                   target_os = "linux",
                   target_os = "netbsd",
                   target_os = "openbsd"))]
@@ -219,7 +202,7 @@ libc_bitflags!{
         /// (via the [`fcntl`](../../fcntl/fn.fcntl.html)
         /// `F_SETFL` operation), but differs in that `MSG_DONTWAIT` is a per-
         /// call option, whereas `O_NONBLOCK` is a setting on the open file
-        /// description (see [open(2)](https://man7.org/linux/man-pages/man2/open.2.html)),
+        /// description (see [open(2)](http://man7.org/linux/man-pages/man2/open.2.html)),
         /// which will affect all threads in
         /// the calling process and as well as other processes that hold
         /// file descriptors referring to the same open file description.
@@ -247,7 +230,7 @@ libc_bitflags!{
         /// file descriptor using the `SCM_RIGHTS` operation (described in
         /// [unix(7)](https://linux.die.net/man/7/unix)).
         /// This flag is useful for the same reasons as the `O_CLOEXEC` flag of
-        /// [open(2)](https://pubs.opengroup.org/onlinepubs/9699919799/functions/open.html).
+        /// [open(2)](http://pubs.opengroup.org/onlinepubs/9699919799/functions/open.html).
         ///
         /// Only used in [`recvmsg`](fn.recvmsg.html) function.
         #[cfg(any(target_os = "android",
@@ -418,11 +401,13 @@ impl Ipv6MembershipRequest {
 macro_rules! cmsg_space {
     ( $( $x:ty ),* ) => {
         {
+            use nix::sys::socket::{c_uint, CMSG_SPACE};
+            use std::mem;
             let mut space = 0;
             $(
                 // CMSG_SPACE is always safe
                 space += unsafe {
-                    $crate::sys::socket::CMSG_SPACE(::std::mem::size_of::<$x>() as $crate::sys::socket::c_uint)
+                    CMSG_SPACE(mem::size_of::<$x>() as c_uint)
                 } as usize;
             )*
             Vec::<u8>::with_capacity(space)
@@ -482,7 +467,7 @@ impl<'a> Iterator for CmsgIterator<'a> {
 /// A type-safe wrapper around a single control message, as used with
 /// [`recvmsg`](#fn.recvmsg).
 ///
-/// [Further reading](https://man7.org/linux/man-pages/man3/cmsg.3.html)
+/// [Further reading](http://man7.org/linux/man-pages/man3/cmsg.3.html)
 //  Nix version 0.13.0 and earlier used ControlMessage for both recvmsg and
 //  sendmsg.  However, on some platforms the messages returned by recvmsg may be
 //  unaligned.  ControlMessageOwned takes those messages by copy, obviating any
@@ -510,7 +495,6 @@ pub enum ControlMessageOwned {
     ///
     /// # Examples
     ///
-    /// ```
     /// # #[macro_use] extern crate nix;
     /// # use nix::sys::socket::*;
     /// # use nix::sys::uio::IoVec;
@@ -558,11 +542,6 @@ pub enum ControlMessageOwned {
     /// # }
     /// ```
     ScmTimestamp(TimeVal),
-    /// Nanoseconds resolution timestamp
-    ///
-    /// [Further reading](https://www.kernel.org/doc/html/latest/networking/timestamping.html)
-    #[cfg(all(target_os = "linux"))]
-    ScmTimestampns(TimeSpec),
     #[cfg(any(
         target_os = "android",
         target_os = "ios",
@@ -610,17 +589,6 @@ pub enum ControlMessageOwned {
     #[cfg(target_os = "linux")]
     UdpGroSegments(u16),
 
-    /// SO_RXQ_OVFL indicates that an unsigned 32 bit value
-    /// ancilliary msg (cmsg) should be attached to recieved
-    /// skbs indicating the number of packets dropped by the
-    /// socket between the last recieved packet and this
-    /// received packet.
-    ///
-    /// `RxqOvfl` socket option should be enabled on a socket
-    /// to allow receiving the drop counter.
-    #[cfg(any(target_os = "android", target_os = "fuchsia", target_os = "linux"))]
-    RxqOvfl(u32),
-
     /// Catch-all variant for unimplemented cmsg types.
     #[doc(hidden)]
     Unknown(UnknownCmsg),
@@ -665,11 +633,6 @@ impl ControlMessageOwned {
                 let tv: libc::timeval = ptr::read_unaligned(p as *const _);
                 ControlMessageOwned::ScmTimestamp(TimeVal::from(tv))
             },
-            #[cfg(all(target_os = "linux"))]
-            (libc::SOL_SOCKET, libc::SCM_TIMESTAMPNS) => {
-                let ts: libc::timespec = ptr::read_unaligned(p as *const _);
-                ControlMessageOwned::ScmTimestampns(TimeSpec::from(ts))
-            }
             #[cfg(any(
                 target_os = "android",
                 target_os = "freebsd",
@@ -719,14 +682,9 @@ impl ControlMessageOwned {
                 let gso_size: u16 = ptr::read_unaligned(p as *const _);
                 ControlMessageOwned::UdpGroSegments(gso_size)
             },
-            #[cfg(any(target_os = "android", target_os = "fuchsia", target_os = "linux"))]
-            (libc::SOL_SOCKET, libc::SO_RXQ_OVFL) => {
-                let drop_counter = ptr::read_unaligned(p as *const u32);
-                ControlMessageOwned::RxqOvfl(drop_counter)
-            },
             (_, _) => {
                 let sl = slice::from_raw_parts(p, len);
-                let ucmsg = UnknownCmsg(*header, Vec::<u8>::from(sl));
+                let ucmsg = UnknownCmsg(*header, Vec::<u8>::from(&sl[..]));
                 ControlMessageOwned::Unknown(ucmsg)
             }
         }
@@ -737,14 +695,14 @@ impl ControlMessageOwned {
 /// [`sendmsg`](#fn.sendmsg).  More types may be added to this enum; do not
 /// exhaustively pattern-match it.
 ///
-/// [Further reading](https://man7.org/linux/man-pages/man3/cmsg.3.html)
+/// [Further reading](http://man7.org/linux/man-pages/man3/cmsg.3.html)
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum ControlMessage<'a> {
     /// A message of type `SCM_RIGHTS`, containing an array of file
     /// descriptors passed between processes.
     ///
     /// See the description in the "Ancillary messages" section of the
-    /// [unix(7) man page](https://man7.org/linux/man-pages/man7/unix.7.html).
+    /// [unix(7) man page](http://man7.org/linux/man-pages/man7/unix.7.html).
     ///
     /// Using multiple `ScmRights` messages for a single `sendmsg` call isn't
     /// recommended since it causes platform-dependent behaviour: It might
@@ -761,7 +719,7 @@ pub enum ControlMessage<'a> {
     /// processes are verified by the kernel.
     ///
     /// For further information, please refer to the
-    /// [`unix(7)`](https://man7.org/linux/man-pages/man7/unix.7.html) man page.
+    /// [`unix(7)`](http://man7.org/linux/man-pages/man7/unix.7.html) man page.
     #[cfg(any(target_os = "android", target_os = "linux"))]
     ScmCredentials(&'a UnixCredentials),
     /// A message of type `SCM_CREDS`, containing the pid, uid, euid, gid and groups of
@@ -823,7 +781,7 @@ pub enum ControlMessage<'a> {
     /// Configure the sending addressing and interface for v4
     ///
     /// For further information, please refer to the
-    /// [`ip(7)`](https://man7.org/linux/man-pages/man7/ip.7.html) man page.
+    /// [`ip(7)`](http://man7.org/linux/man-pages/man7/ip.7.html) man page.
     #[cfg(any(target_os = "linux",
               target_os = "macos",
               target_os = "netbsd",
@@ -834,7 +792,7 @@ pub enum ControlMessage<'a> {
     /// Configure the sending addressing and interface for v6
     ///
     /// For further information, please refer to the
-    /// [`ipv6(7)`](https://man7.org/linux/man-pages/man7/ipv6.7.html) man page.
+    /// [`ipv6(7)`](http://man7.org/linux/man-pages/man7/ipv6.7.html) man page.
     #[cfg(any(target_os = "linux",
               target_os = "macos",
               target_os = "netbsd",
@@ -842,14 +800,6 @@ pub enum ControlMessage<'a> {
               target_os = "android",
               target_os = "ios",))]
     Ipv6PacketInfo(&'a libc::in6_pktinfo),
-
-    /// SO_RXQ_OVFL indicates that an unsigned 32 bit value
-    /// ancilliary msg (cmsg) should be attached to recieved
-    /// skbs indicating the number of packets dropped by the
-    /// socket between the last recieved packet and this
-    /// received packet.
-    #[cfg(any(target_os = "android", target_os = "fuchsia", target_os = "linux"))]
-    RxqOvfl(&'a u32),
 }
 
 // An opaque structure used to prevent cmsghdr from being a public type
@@ -940,10 +890,6 @@ impl<'a> ControlMessage<'a> {
                       target_os = "netbsd", target_os = "freebsd",
                       target_os = "android", target_os = "ios",))]
             ControlMessage::Ipv6PacketInfo(info) => info as *const _ as *const u8,
-            #[cfg(any(target_os = "android", target_os = "fuchsia", target_os = "linux"))]
-            ControlMessage::RxqOvfl(drop_count) => {
-                drop_count as *const _ as *const u8
-            },
         };
         unsafe {
             ptr::copy_nonoverlapping(
@@ -992,10 +938,6 @@ impl<'a> ControlMessage<'a> {
               target_os = "netbsd", target_os = "freebsd",
               target_os = "android", target_os = "ios",))]
             ControlMessage::Ipv6PacketInfo(info) => mem::size_of_val(info),
-            #[cfg(any(target_os = "android", target_os = "fuchsia", target_os = "linux"))]
-            ControlMessage::RxqOvfl(drop_count) => {
-                mem::size_of_val(drop_count)
-            },
         }
     }
 
@@ -1020,8 +962,6 @@ impl<'a> ControlMessage<'a> {
               target_os = "netbsd", target_os = "freebsd",
               target_os = "android", target_os = "ios",))]
             ControlMessage::Ipv6PacketInfo(_) => libc::IPPROTO_IPV6,
-            #[cfg(any(target_os = "android", target_os = "fuchsia", target_os = "linux"))]
-            ControlMessage::RxqOvfl(_) => libc::SOL_SOCKET,
         }
     }
 
@@ -1057,10 +997,6 @@ impl<'a> ControlMessage<'a> {
                       target_os = "netbsd", target_os = "freebsd",
                       target_os = "android", target_os = "ios",))]
             ControlMessage::Ipv6PacketInfo(_) => libc::IPV6_PKTINFO,
-            #[cfg(any(target_os = "android", target_os = "fuchsia", target_os = "linux"))]
-            ControlMessage::RxqOvfl(_) => {
-                libc::SO_RXQ_OVFL
-            },
         }
     }
 
@@ -1153,22 +1089,23 @@ pub fn sendmmsg<'a, I, C>(
 
     let mut output = Vec::<libc::mmsghdr>::with_capacity(reserve_items);
 
-    let mut cmsgs_buffers = Vec::<Vec<u8>>::with_capacity(reserve_items);
+    let mut cmsgs_buffer = vec![0u8; 0];
 
     for d in iter {
-        let capacity: usize = d.cmsgs.as_ref().iter().map(|c| c.space()).sum();
-        let mut cmsgs_buffer = vec![0u8; capacity];
+        let cmsgs_start = cmsgs_buffer.len();
+        let cmsgs_required_capacity: usize = d.cmsgs.as_ref().iter().map(|c| c.space()).sum();
+        let cmsgs_buffer_need_capacity = cmsgs_start + cmsgs_required_capacity;
+        cmsgs_buffer.resize(cmsgs_buffer_need_capacity, 0);
 
         output.push(libc::mmsghdr {
             msg_hdr: pack_mhdr_to_send(
-                &mut cmsgs_buffer,
+                &mut cmsgs_buffer[cmsgs_start..],
                 &d.iov,
                 &d.cmsgs,
                 d.addr.as_ref()
             ),
             msg_len: 0,
         });
-        cmsgs_buffers.push(cmsgs_buffer);
     };
 
     let ret = unsafe { libc::sendmmsg(fd, output.as_mut_ptr(), output.len() as _, flags.bits() as _) };
@@ -1441,7 +1378,7 @@ fn pack_mhdr_to_send<'a, I, C>(
 /// * `flags`:          Optional flags passed directly to the operating system.
 ///
 /// # References
-/// [recvmsg(2)](https://pubs.opengroup.org/onlinepubs/9699919799/functions/recvmsg.html)
+/// [recvmsg(2)](http://pubs.opengroup.org/onlinepubs/9699919799/functions/recvmsg.html)
 pub fn recvmsg<'a>(fd: RawFd, iov: &[IoVec<&mut [u8]>],
                    mut cmsg_buffer: Option<&'a mut Vec<u8>>,
                    flags: MsgFlags) -> Result<RecvMsg<'a>>
@@ -1469,7 +1406,7 @@ pub fn recvmsg<'a>(fd: RawFd, iov: &[IoVec<&mut [u8]>],
 /// protocols may exist, in which case a particular protocol must be
 /// specified in this manner.
 ///
-/// [Further reading](https://pubs.opengroup.org/onlinepubs/9699919799/functions/socket.html)
+/// [Further reading](http://pubs.opengroup.org/onlinepubs/9699919799/functions/socket.html)
 pub fn socket<T: Into<Option<SockProtocol>>>(domain: AddressFamily, ty: SockType, flags: SockFlag, protocol: T) -> Result<RawFd> {
     let protocol = match protocol.into() {
         None => 0,
@@ -1489,7 +1426,7 @@ pub fn socket<T: Into<Option<SockProtocol>>>(domain: AddressFamily, ty: SockType
 
 /// Create a pair of connected sockets
 ///
-/// [Further reading](https://pubs.opengroup.org/onlinepubs/9699919799/functions/socketpair.html)
+/// [Further reading](http://pubs.opengroup.org/onlinepubs/9699919799/functions/socketpair.html)
 pub fn socketpair<T: Into<Option<SockProtocol>>>(domain: AddressFamily, ty: SockType, protocol: T,
                   flags: SockFlag) -> Result<(RawFd, RawFd)> {
     let protocol = match protocol.into() {
@@ -1513,7 +1450,7 @@ pub fn socketpair<T: Into<Option<SockProtocol>>>(domain: AddressFamily, ty: Sock
 
 /// Listen for connections on a socket
 ///
-/// [Further reading](https://pubs.opengroup.org/onlinepubs/9699919799/functions/listen.html)
+/// [Further reading](http://pubs.opengroup.org/onlinepubs/9699919799/functions/listen.html)
 pub fn listen(sockfd: RawFd, backlog: usize) -> Result<()> {
     let res = unsafe { libc::listen(sockfd, backlog as c_int) };
 
@@ -1522,7 +1459,7 @@ pub fn listen(sockfd: RawFd, backlog: usize) -> Result<()> {
 
 /// Bind a name to a socket
 ///
-/// [Further reading](https://pubs.opengroup.org/onlinepubs/9699919799/functions/bind.html)
+/// [Further reading](http://pubs.opengroup.org/onlinepubs/9699919799/functions/bind.html)
 pub fn bind(fd: RawFd, addr: &SockAddr) -> Result<()> {
     let res = unsafe {
         let (ptr, len) = addr.as_ffi_pair();
@@ -1534,7 +1471,7 @@ pub fn bind(fd: RawFd, addr: &SockAddr) -> Result<()> {
 
 /// Accept a connection on a socket
 ///
-/// [Further reading](https://pubs.opengroup.org/onlinepubs/9699919799/functions/accept.html)
+/// [Further reading](http://pubs.opengroup.org/onlinepubs/9699919799/functions/accept.html)
 pub fn accept(sockfd: RawFd) -> Result<RawFd> {
     let res = unsafe { libc::accept(sockfd, ptr::null_mut(), ptr::null_mut()) };
 
@@ -1543,15 +1480,8 @@ pub fn accept(sockfd: RawFd) -> Result<RawFd> {
 
 /// Accept a connection on a socket
 ///
-/// [Further reading](https://man7.org/linux/man-pages/man2/accept.2.html)
-#[cfg(any(all(
-            target_os = "android",
-            any(
-                target_arch = "aarch64",
-                target_arch = "x86",
-                target_arch = "x86_64"
-            )
-          ),
+/// [Further reading](http://man7.org/linux/man-pages/man2/accept.2.html)
+#[cfg(any(target_os = "android",
           target_os = "freebsd",
           target_os = "linux",
           target_os = "openbsd"))]
@@ -1563,7 +1493,7 @@ pub fn accept4(sockfd: RawFd, flags: SockFlag) -> Result<RawFd> {
 
 /// Initiate a connection on a socket
 ///
-/// [Further reading](https://pubs.opengroup.org/onlinepubs/9699919799/functions/connect.html)
+/// [Further reading](http://pubs.opengroup.org/onlinepubs/9699919799/functions/connect.html)
 pub fn connect(fd: RawFd, addr: &SockAddr) -> Result<()> {
     let res = unsafe {
         let (ptr, len) = addr.as_ffi_pair();
@@ -1576,7 +1506,7 @@ pub fn connect(fd: RawFd, addr: &SockAddr) -> Result<()> {
 /// Receive data from a connection-oriented socket. Returns the number of
 /// bytes read
 ///
-/// [Further reading](https://pubs.opengroup.org/onlinepubs/9699919799/functions/recv.html)
+/// [Further reading](http://pubs.opengroup.org/onlinepubs/9699919799/functions/recv.html)
 pub fn recv(sockfd: RawFd, buf: &mut [u8], flags: MsgFlags) -> Result<usize> {
     unsafe {
         let ret = libc::recv(
@@ -1593,7 +1523,7 @@ pub fn recv(sockfd: RawFd, buf: &mut [u8], flags: MsgFlags) -> Result<usize> {
 /// the number of bytes read and, for connectionless sockets,  the socket
 /// address of the sender.
 ///
-/// [Further reading](https://pubs.opengroup.org/onlinepubs/9699919799/functions/recvfrom.html)
+/// [Further reading](http://pubs.opengroup.org/onlinepubs/9699919799/functions/recvfrom.html)
 pub fn recvfrom(sockfd: RawFd, buf: &mut [u8])
     -> Result<(usize, Option<SockAddr>)>
 {
@@ -1610,7 +1540,7 @@ pub fn recvfrom(sockfd: RawFd, buf: &mut [u8])
             &mut len as *mut socklen_t))? as usize;
 
         match sockaddr_storage_to_addr(&addr, len as usize) {
-            Err(Errno::ENOTCONN) => Ok((ret, None)),
+            Err(Error::Sys(Errno::ENOTCONN)) => Ok((ret, None)),
             Ok(addr) => Ok((ret, Some(addr))),
             Err(e) => Err(e)
         }
@@ -1619,7 +1549,7 @@ pub fn recvfrom(sockfd: RawFd, buf: &mut [u8])
 
 /// Send a message to a socket
 ///
-/// [Further reading](https://pubs.opengroup.org/onlinepubs/9699919799/functions/sendto.html)
+/// [Further reading](http://pubs.opengroup.org/onlinepubs/9699919799/functions/sendto.html)
 pub fn sendto(fd: RawFd, buf: &[u8], addr: &SockAddr, flags: MsgFlags) -> Result<usize> {
     let ret = unsafe {
         let (ptr, len) = addr.as_ffi_pair();
@@ -1631,7 +1561,7 @@ pub fn sendto(fd: RawFd, buf: &[u8], addr: &SockAddr, flags: MsgFlags) -> Result
 
 /// Send data to a connection-oriented socket. Returns the number of bytes read
 ///
-/// [Further reading](https://pubs.opengroup.org/onlinepubs/9699919799/functions/send.html)
+/// [Further reading](http://pubs.opengroup.org/onlinepubs/9699919799/functions/send.html)
 pub fn send(fd: RawFd, buf: &[u8], flags: MsgFlags) -> Result<usize> {
     let ret = unsafe {
         libc::send(fd, buf.as_ptr() as *const c_void, buf.len() as size_t, flags.bits())
@@ -1666,14 +1596,14 @@ pub trait SetSockOpt : Clone {
 
 /// Get the current value for the requested socket option
 ///
-/// [Further reading](https://pubs.opengroup.org/onlinepubs/9699919799/functions/getsockopt.html)
+/// [Further reading](http://pubs.opengroup.org/onlinepubs/9699919799/functions/getsockopt.html)
 pub fn getsockopt<O: GetSockOpt>(fd: RawFd, opt: O) -> Result<O::Val> {
     opt.get(fd)
 }
 
 /// Sets the value for the requested socket option
 ///
-/// [Further reading](https://pubs.opengroup.org/onlinepubs/9699919799/functions/setsockopt.html)
+/// [Further reading](http://pubs.opengroup.org/onlinepubs/9699919799/functions/setsockopt.html)
 ///
 /// # Examples
 ///
@@ -1694,7 +1624,7 @@ pub fn setsockopt<O: SetSockOpt>(fd: RawFd, opt: O, val: &O::Val) -> Result<()> 
 
 /// Get the address of the peer connected to the socket `fd`.
 ///
-/// [Further reading](https://pubs.opengroup.org/onlinepubs/9699919799/functions/getpeername.html)
+/// [Further reading](http://pubs.opengroup.org/onlinepubs/9699919799/functions/getpeername.html)
 pub fn getpeername(fd: RawFd) -> Result<SockAddr> {
     unsafe {
         let mut addr = mem::MaybeUninit::uninit();
@@ -1714,7 +1644,7 @@ pub fn getpeername(fd: RawFd) -> Result<SockAddr> {
 
 /// Get the current address to which the socket `fd` is bound.
 ///
-/// [Further reading](https://pubs.opengroup.org/onlinepubs/9699919799/functions/getsockname.html)
+/// [Further reading](http://pubs.opengroup.org/onlinepubs/9699919799/functions/getsockname.html)
 pub fn getsockname(fd: RawFd) -> Result<SockAddr> {
     unsafe {
         let mut addr = mem::MaybeUninit::uninit();
@@ -1746,7 +1676,7 @@ pub fn sockaddr_storage_to_addr(
 
     assert!(len <= mem::size_of::<sockaddr_un>());
     if len < mem::size_of_val(&addr.ss_family) {
-        return Err(Error::from(Errno::ENOTCONN));
+        return Err(Error::Sys(Errno::ENOTCONN));
     }
 
     match c_int::from(addr.ss_family) {
@@ -1774,10 +1704,7 @@ pub fn sockaddr_storage_to_addr(
         #[cfg(any(target_os = "android", target_os = "linux"))]
         libc::AF_PACKET => {
             use libc::sockaddr_ll;
-            // Apparently the Linux kernel can return smaller sizes when
-            // the value in the last element of sockaddr_ll (`sll_addr`) is
-            // smaller than the declared size of that field
-            assert!(len as usize <= mem::size_of::<sockaddr_ll>());
+            assert_eq!(len as usize, mem::size_of::<sockaddr_ll>());
             let sll = unsafe {
                 *(addr as *const _ as *const sockaddr_ll)
             };
@@ -1824,7 +1751,7 @@ pub enum Shutdown {
 
 /// Shut down part of a full-duplex connection.
 ///
-/// [Further reading](https://pubs.opengroup.org/onlinepubs/9699919799/functions/shutdown.html)
+/// [Further reading](http://pubs.opengroup.org/onlinepubs/9699919799/functions/shutdown.html)
 pub fn shutdown(df: RawFd, how: Shutdown) -> Result<()> {
     unsafe {
         use libc::shutdown;
@@ -1836,13 +1763,5 @@ pub fn shutdown(df: RawFd, how: Shutdown) -> Result<()> {
         };
 
         Errno::result(shutdown(df, how)).map(drop)
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn can_use_cmsg_space() {
-        let _ = cmsg_space!(u8);
     }
 }
