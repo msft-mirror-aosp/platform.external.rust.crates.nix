@@ -1,3 +1,4 @@
+use nix::Error;
 use nix::errno::Errno;
 use nix::unistd::getpid;
 use nix::sys::ptrace;
@@ -15,8 +16,8 @@ fn test_ptrace() {
     // FIXME: qemu-user doesn't implement ptrace on all arches, so permit ENOSYS
     require_capability!(CAP_SYS_PTRACE);
     let err = ptrace::attach(getpid()).unwrap_err();
-    assert!(err == Errno::EPERM || err == Errno::EINVAL ||
-            err == Errno::ENOSYS);
+    assert!(err == Error::Sys(Errno::EPERM) || err == Error::Sys(Errno::EINVAL) ||
+            err == Error::Sys(Errno::ENOSYS));
 }
 
 // Just make sure ptrace_setoptions can be called at all, for now.
@@ -25,7 +26,7 @@ fn test_ptrace() {
 fn test_ptrace_setoptions() {
     require_capability!(CAP_SYS_PTRACE);
     let err = ptrace::setoptions(getpid(), Options::PTRACE_O_TRACESYSGOOD).unwrap_err();
-    assert!(err != Errno::EOPNOTSUPP);
+    assert!(err != Error::UnsupportedOperation);
 }
 
 // Just make sure ptrace_getevent can be called at all, for now.
@@ -34,7 +35,7 @@ fn test_ptrace_setoptions() {
 fn test_ptrace_getevent() {
     require_capability!(CAP_SYS_PTRACE);
     let err = ptrace::getevent(getpid()).unwrap_err();
-    assert!(err != Errno::EOPNOTSUPP);
+    assert!(err != Error::UnsupportedOperation);
 }
 
 // Just make sure ptrace_getsiginfo can be called at all, for now.
@@ -42,8 +43,8 @@ fn test_ptrace_getevent() {
 #[cfg(any(target_os = "android", target_os = "linux"))]
 fn test_ptrace_getsiginfo() {
     require_capability!(CAP_SYS_PTRACE);
-    if let Err(Errno::EOPNOTSUPP) = ptrace::getsiginfo(getpid()) {
-        panic!("ptrace_getsiginfo returns Errno::EOPNOTSUPP!");
+    if let Err(Error::UnsupportedOperation) = ptrace::getsiginfo(getpid()) {
+        panic!("ptrace_getsiginfo returns Error::UnsupportedOperation!");
     }
 }
 
@@ -53,8 +54,8 @@ fn test_ptrace_getsiginfo() {
 fn test_ptrace_setsiginfo() {
     require_capability!(CAP_SYS_PTRACE);
     let siginfo = unsafe { mem::zeroed() };
-    if let Err(Errno::EOPNOTSUPP) = ptrace::setsiginfo(getpid(), &siginfo) {
-        panic!("ptrace_setsiginfo returns Errno::EOPNOTSUPP!");
+    if let Err(Error::UnsupportedOperation) = ptrace::setsiginfo(getpid(), &siginfo) {
+        panic!("ptrace_setsiginfo returns Error::UnsupportedOperation!");
     }
 }
 
@@ -78,7 +79,7 @@ fn test_ptrace_cont() {
     // On valid platforms the ptrace call should return Errno::EPERM, this
     // is already tested by `test_ptrace`.
     let err = ptrace::attach(getpid()).unwrap_err();
-    if err == Errno::ENOSYS {
+    if err == Error::Sys(Errno::ENOSYS) {
         return;
     }
 
