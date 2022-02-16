@@ -68,7 +68,7 @@ mod sched_linux_like {
         /// `field` is the CPU id to test
         pub fn is_set(&self, field: usize) -> Result<bool> {
             if field >= CpuSet::count() {
-                Err(Error::from(Errno::EINVAL))
+                Err(Error::Sys(Errno::EINVAL))
             } else {
                 Ok(unsafe { libc::CPU_ISSET(field, &self.cpu_set) })
             }
@@ -78,7 +78,7 @@ mod sched_linux_like {
         /// `field` is the CPU id to add
         pub fn set(&mut self, field: usize) -> Result<()> {
             if field >= CpuSet::count() {
-                Err(Error::from(Errno::EINVAL))
+                Err(Error::Sys(Errno::EINVAL))
             } else {
                 unsafe { libc::CPU_SET(field, &mut self.cpu_set); }
                 Ok(())
@@ -89,7 +89,7 @@ mod sched_linux_like {
         /// `field` is the CPU id to remove
         pub fn unset(&mut self, field: usize) -> Result<()> {
             if field >= CpuSet::count() {
-                Err(Error::from(Errno::EINVAL))
+                Err(Error::Sys(Errno::EINVAL))
             } else {
                 unsafe { libc::CPU_CLR(field, &mut self.cpu_set);}
                 Ok(())
@@ -109,7 +109,7 @@ mod sched_linux_like {
     }
 
     /// `sched_setaffinity` set a thread's CPU affinity mask
-    /// ([`sched_setaffinity(2)`](https://man7.org/linux/man-pages/man2/sched_setaffinity.2.html))
+    /// ([`sched_setaffinity(2)`](http://man7.org/linux/man-pages/man2/sched_setaffinity.2.html))
     ///
     /// `pid` is the thread ID to update.
     /// If pid is zero, then the calling thread is updated.
@@ -142,7 +142,7 @@ mod sched_linux_like {
     }
 
     /// `sched_getaffinity` get a thread's CPU affinity mask
-    /// ([`sched_getaffinity(2)`](https://man7.org/linux/man-pages/man2/sched_getaffinity.2.html))
+    /// ([`sched_getaffinity(2)`](http://man7.org/linux/man-pages/man2/sched_getaffinity.2.html))
     ///
     /// `pid` is the thread ID to check.
     /// If pid is zero, then the calling thread is checked.
@@ -176,14 +176,6 @@ mod sched_linux_like {
         Errno::result(res).and(Ok(cpuset))
     }
 
-    /// `clone` create a child process
-    /// ([`clone(2)`](https://man7.org/linux/man-pages/man2/clone.2.html))
-    ///
-    /// `stack` is a reference to an array which will hold the stack of the new
-    /// process.  Unlike when calling `clone(2)` from C, the provided stack
-    /// address need not be the highest address of the region.  Nix will take
-    /// care of that requirement.  The user only needs to provide a reference to
-    /// a normally allocated buffer.
     pub fn clone(
         mut cb: CloneCb,
         stack: &mut [u8],
@@ -227,7 +219,7 @@ mod sched_linux_like {
 
 /// Explicitly yield the processor to other threads.
 ///
-/// [Further reading](https://pubs.opengroup.org/onlinepubs/9699919799/functions/sched_yield.html)
+/// [Further reading](http://pubs.opengroup.org/onlinepubs/9699919799/functions/sched_yield.html)
 pub fn sched_yield() -> Result<()> {
     let res = unsafe { libc::sched_yield() };
 

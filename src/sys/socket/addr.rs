@@ -1,7 +1,6 @@
 use super::sa_family_t;
 use crate::{Error, Result, NixPath};
 use crate::errno::Errno;
-use memoffset::offset_of;
 use std::{fmt, mem, net, ptr, slice};
 use std::ffi::OsStr;
 use std::hash::{Hash, Hasher};
@@ -21,7 +20,6 @@ use crate::sys::socket::addr::sys_control::SysControlAddr;
           target_os = "ios",
           target_os = "linux",
           target_os = "macos",
-          target_os = "illumos",
           target_os = "netbsd",
           target_os = "openbsd",
           target_os = "fuchsia"))]
@@ -34,21 +32,17 @@ pub use self::vsock::VsockAddr;
 #[repr(i32)]
 #[derive(Copy, Clone, PartialEq, Eq, Debug, Hash)]
 pub enum AddressFamily {
-    /// Local communication (see [`unix(7)`](https://man7.org/linux/man-pages/man7/unix.7.html))
+    /// Local communication (see [`unix(7)`](http://man7.org/linux/man-pages/man7/unix.7.html))
     Unix = libc::AF_UNIX,
-    /// IPv4 Internet protocols (see [`ip(7)`](https://man7.org/linux/man-pages/man7/ip.7.html))
+    /// IPv4 Internet protocols (see [`ip(7)`](http://man7.org/linux/man-pages/man7/ip.7.html))
     Inet = libc::AF_INET,
-    /// IPv6 Internet protocols (see [`ipv6(7)`](https://man7.org/linux/man-pages/man7/ipv6.7.html))
+    /// IPv6 Internet protocols (see [`ipv6(7)`](http://man7.org/linux/man-pages/man7/ipv6.7.html))
     Inet6 = libc::AF_INET6,
-    /// Kernel user interface device (see [`netlink(7)`](https://man7.org/linux/man-pages/man7/netlink.7.html))
+    /// Kernel user interface device (see [`netlink(7)`](http://man7.org/linux/man-pages/man7/netlink.7.html))
     #[cfg(any(target_os = "android", target_os = "linux"))]
     Netlink = libc::AF_NETLINK,
-    /// Low level packet interface (see [`packet(7)`](https://man7.org/linux/man-pages/man7/packet.7.html))
-    #[cfg(any(target_os = "android",
-              target_os = "linux",
-              target_os = "illumos",
-              target_os = "fuchsia",
-              target_os = "solaris"))]
+    /// Low level packet interface (see [`packet(7)`](http://man7.org/linux/man-pages/man7/packet.7.html))
+    #[cfg(any(target_os = "android", target_os = "linux", target_os = "fuchsia"))]
     Packet = libc::AF_PACKET,
     /// KEXT Controls and Notifications
     #[cfg(any(target_os = "ios", target_os = "macos"))]
@@ -67,7 +61,7 @@ pub enum AddressFamily {
     /// Access to raw ATM PVCs
     #[cfg(any(target_os = "android", target_os = "linux"))]
     AtmPvc = libc::AF_ATMPVC,
-    /// ITU-T X.25 / ISO-8208 protocol (see [`x25(7)`](https://man7.org/linux/man-pages/man7/x25.7.html))
+    /// ITU-T X.25 / ISO-8208 protocol (see [`x25(7)`](http://man7.org/linux/man-pages/man7/x25.7.html))
     #[cfg(any(target_os = "android", target_os = "linux"))]
     X25 = libc::AF_X25,
     #[cfg(any(target_os = "android", target_os = "linux"))]
@@ -104,16 +98,12 @@ pub enum AddressFamily {
     Can = libc::AF_CAN,
     #[cfg(any(target_os = "android", target_os = "linux"))]
     Tipc = libc::AF_TIPC,
-    #[cfg(not(any(target_os = "illumos",
-                  target_os = "ios",
-                  target_os = "macos",
-                  target_os = "solaris")))]
+    #[cfg(not(any(target_os = "ios", target_os = "macos")))]
     Bluetooth = libc::AF_BLUETOOTH,
     #[cfg(any(target_os = "android", target_os = "linux"))]
     Iucv = libc::AF_IUCV,
     #[cfg(any(target_os = "android", target_os = "linux"))]
     RxRpc = libc::AF_RXRPC,
-    #[cfg(not(any(target_os = "illumos", target_os = "solaris")))]
     Isdn = libc::AF_ISDN,
     #[cfg(any(target_os = "android", target_os = "linux"))]
     Phonet = libc::AF_PHONET,
@@ -200,7 +190,6 @@ pub enum AddressFamily {
               target_os = "freebsd",
               target_os = "ios",
               target_os = "macos",
-              target_os = "illumos",
               target_os = "netbsd",
               target_os = "openbsd"))]
     Link = libc::AF_LINK,
@@ -225,7 +214,7 @@ pub enum AddressFamily {
               target_os = "netbsd",
               target_os = "openbsd"))]
     Natm = libc::AF_NATM,
-    /// Unspecified address family, (see [`getaddrinfo(3)`](https://man7.org/linux/man-pages/man3/getaddrinfo.3.html))
+    /// Unspecified address family, (see [`getaddrinfo(3)`](http://man7.org/linux/man-pages/man3/getaddrinfo.3.html))
     #[cfg(any(target_os = "android", target_os = "linux"))]
     Unspec = libc::AF_UNSPEC,
 }
@@ -252,7 +241,6 @@ impl AddressFamily {
                       target_os = "ios",
                       target_os = "macos",
                       target_os = "netbsd",
-                      target_os = "illumos",
                       target_os = "openbsd"))]
             libc::AF_LINK => Some(AddressFamily::Link),
             #[cfg(any(target_os = "android", target_os = "linux"))]
@@ -536,7 +524,7 @@ impl UnixAddr {
                 let bytes = cstr.to_bytes();
 
                 if bytes.len() > ret.sun_path.len() {
-                    return Err(Error::from(Errno::ENAMETOOLONG));
+                    return Err(Error::Sys(Errno::ENAMETOOLONG));
                 }
 
                 ptr::copy_nonoverlapping(bytes.as_ptr(),
@@ -563,7 +551,7 @@ impl UnixAddr {
             };
 
             if path.len() + 1 > ret.sun_path.len() {
-                return Err(Error::from(Errno::ENAMETOOLONG));
+                return Err(Error::Sys(Errno::ENAMETOOLONG));
             }
 
             // Abstract addresses are represented by sun_path[0] ==
@@ -657,7 +645,6 @@ pub enum SockAddr {
               target_os = "ios",
               target_os = "linux",
               target_os = "macos",
-              target_os = "illumos",
               target_os = "netbsd",
               target_os = "openbsd"))]
     Link(LinkAddr),
@@ -712,7 +699,6 @@ impl SockAddr {
                       target_os = "ios",
                       target_os = "macos",
                       target_os = "netbsd",
-                      target_os = "illumos",
                       target_os = "openbsd"))]
             SockAddr::Link(..) => AddressFamily::Link,
             #[cfg(any(target_os = "android", target_os = "linux"))]
@@ -758,7 +744,6 @@ impl SockAddr {
                           target_os = "ios",
                           target_os = "macos",
                           target_os = "netbsd",
-                          target_os = "illumos",
                           target_os = "openbsd"))]
                 Some(AddressFamily::Link) => {
                     let ether_addr = LinkAddr(*(addr as *const libc::sockaddr_dl));
@@ -845,7 +830,6 @@ impl SockAddr {
                       target_os = "freebsd",
                       target_os = "ios",
                       target_os = "macos",
-                      target_os = "illumos",
                       target_os = "netbsd",
                       target_os = "openbsd"))]
             SockAddr::Link(LinkAddr(ref addr)) => (
@@ -885,7 +869,6 @@ impl fmt::Display for SockAddr {
                       target_os = "linux",
                       target_os = "macos",
                       target_os = "netbsd",
-                      target_os = "illumos",
                       target_os = "openbsd"))]
             SockAddr::Link(ref ether_addr) => ether_addr.fmt(f),
             #[cfg(any(target_os = "android", target_os = "linux"))]
@@ -1035,7 +1018,7 @@ pub mod sys_control {
 
         pub fn from_name(sockfd: RawFd, name: &str, unit: u32) -> Result<SysControlAddr> {
             if name.len() > MAX_KCTL_NAME {
-                return Err(Error::from(Errno::ENAMETOOLONG));
+                return Err(Error::Sys(Errno::ENAMETOOLONG));
             }
 
             let mut ctl_name = [0; MAX_KCTL_NAME];
@@ -1135,7 +1118,6 @@ mod datalink {
           target_os = "freebsd",
           target_os = "ios",
           target_os = "macos",
-          target_os = "illumos",
           target_os = "netbsd",
           target_os = "openbsd"))]
 mod datalink {
@@ -1147,7 +1129,6 @@ mod datalink {
 
     impl LinkAddr {
         /// Total length of sockaddr
-        #[cfg(not(target_os = "illumos"))]
         pub fn len(&self) -> usize {
             self.0.sdl_len as usize
         }
@@ -1299,7 +1280,6 @@ mod tests {
               target_os = "linux",
               target_os = "macos",
               target_os = "netbsd",
-              target_os = "illumos",
               target_os = "openbsd"))]
     use super::*;
 
@@ -1326,28 +1306,6 @@ mod tests {
     #[test]
     fn test_macos_tap_datalink_addr() {
         let bytes = [20i8, 18, 7, 0, 6, 3, 6, 0, 101, 110, 48, 24, 101, -112, -35, 76, -80];
-        let ptr = bytes.as_ptr();
-        let sa = ptr as *const libc::sockaddr;
-        let _sock_addr = unsafe { SockAddr::from_libc_sockaddr(sa) };
-
-        assert!(_sock_addr.is_some());
-
-        let sock_addr = _sock_addr.unwrap();
-
-        assert_eq!(sock_addr.family(), AddressFamily::Link);
-
-        match sock_addr {
-            SockAddr::Link(ether_addr) => {
-                assert_eq!(ether_addr.addr(), [24u8, 101, 144, 221, 76, 176]);
-            },
-            _ => { unreachable!() }
-        };
-    }
-
-    #[cfg(target_os = "illumos")]
-    #[test]
-    fn test_illumos_tap_datalink_addr() {
-        let bytes = [25u8, 0, 0, 0, 6, 0, 6, 0, 24, 101, 144, 221, 76, 176];
         let ptr = bytes.as_ptr();
         let sa = ptr as *const libc::sockaddr;
         let _sock_addr = unsafe { SockAddr::from_libc_sockaddr(sa) };
