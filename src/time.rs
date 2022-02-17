@@ -185,9 +185,9 @@ impl ClockId {
     pub const CLOCK_VIRTUAL: ClockId = ClockId(libc::CLOCK_VIRTUAL);
 }
 
-impl Into<clockid_t> for ClockId {
-    fn into(self) -> clockid_t {
-        self.as_raw()
+impl From<ClockId> for clockid_t {
+    fn from(clock_id: ClockId) -> Self {
+        clock_id.as_raw()
     }
 }
 
@@ -255,6 +255,6 @@ pub fn clock_getcpuclockid(pid: Pid) -> Result<ClockId> {
         let res = unsafe { clk_id.assume_init() };
         Ok(ClockId::from(res))
     } else {
-        Err(Error::Sys(Errno::from_i32(ret)))
+        Err(Error::from(Errno::from_i32(ret)))
     }
 }
