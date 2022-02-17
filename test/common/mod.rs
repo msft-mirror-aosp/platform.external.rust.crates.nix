@@ -31,6 +31,20 @@ cfg_if! {
     }
 }
 
+/// Skip the test if we don't have the ability to mount file systems.
+#[cfg(target_os = "freebsd")]
+#[macro_export] macro_rules! require_mount {
+    ($name:expr) => {
+        use ::sysctl::CtlValue;
+        use nix::unistd::Uid;
+
+        if !Uid::current().is_root() && CtlValue::Int(0) == ::sysctl::value("vfs.usermount").unwrap()
+        {
+            skip!("{} requires the ability to mount file systems. Skipping test.", $name);
+        }
+    }
+}
+
 #[cfg(any(target_os = "linux", target_os= "android"))]
 #[macro_export] macro_rules! skip_if_cirrus {
     ($reason:expr) => {
@@ -114,8 +128,8 @@ cfg_if! {
                 let mut version = Version::parse(fixed_release).unwrap();
 
                 //Keep only numeric parts
-                version.pre.clear();
-                version.build.clear();
+                version.pre = semver::Prerelease::EMPTY;
+                version.build = semver::BuildMetadata::EMPTY;
 
                 if !version_requirement.matches(&version) {
                     skip!("Skip {} because kernel version `{}` doesn't match the requirement `{}`",
