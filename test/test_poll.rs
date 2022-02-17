@@ -1,5 +1,4 @@
 use nix::{
-    Error,
     errno::Errno,
     poll::{PollFlags, poll, PollFd},
     unistd::{write, pipe}
@@ -10,8 +9,8 @@ macro_rules! loop_while_eintr {
         loop {
             match $poll_expr {
                 Ok(nfds) => break nfds,
-                Err(Error::Sys(Errno::EINTR)) => (),
-                Err(e) => panic!(e)
+                Err(Errno::EINTR) => (),
+                Err(e) => panic!("{}", e)
             }
         }
     }
