@@ -63,7 +63,7 @@ impl Errno {
         since = "0.22.0",
         note = "It's a no-op now; just delete it."
     )]
-    pub fn as_errno(self) -> Option<Self> {
+    pub const fn as_errno(self) -> Option<Self> {
         Some(self)
     }
 
@@ -72,8 +72,9 @@ impl Errno {
         since = "0.22.0",
         note = "It's a no-op now; just delete it."
     )]
+    #[allow(clippy::wrong_self_convention)] // False positive
     pub fn from_errno(errno: Errno) -> Error {
-        Error::from(errno)
+        errno
     }
 
     /// Create a new invalid argument error (`EINVAL`)
@@ -81,7 +82,7 @@ impl Errno {
         since = "0.22.0",
         note = "Use Errno::EINVAL instead"
     )]
-    pub fn invalid_argument() -> Error {
+    pub const fn invalid_argument() -> Error {
         Errno::EINVAL
     }
 
@@ -93,7 +94,7 @@ impl Errno {
         desc(self)
     }
 
-    pub fn from_i32(err: i32) -> Errno {
+    pub const fn from_i32(err: i32) -> Errno {
         from_i32(err)
     }
 
@@ -103,6 +104,7 @@ impl Errno {
 
     /// Returns `Ok(value)` if it does not contain the sentinel value. This
     /// should not be used when `-1` is not the errno sentinel value.
+    #[inline]
     pub fn result<S: ErrnoSentinel + PartialEq<S>>(value: S) -> Result<S> {
         if value == S::sentinel() {
             Err(Self::last())
@@ -122,7 +124,7 @@ impl Errno {
     )]
     #[allow(non_snake_case)]
     #[inline]
-    pub fn Sys(errno: Errno) -> Error {
+    pub const fn Sys(errno: Errno) -> Error {
         errno
     }
 }
@@ -768,6 +770,7 @@ fn desc(errno: Errno) -> &'static str {
 mod consts {
     #[derive(Clone, Copy, Debug, Eq, PartialEq)]
     #[repr(i32)]
+    #[non_exhaustive]
     pub enum Errno {
         UnknownErrno    = 0,
         EPERM           = libc::EPERM,
@@ -905,13 +908,29 @@ mod consts {
         EHWPOISON       = libc::EHWPOISON,
     }
 
+    #[deprecated(
+        since = "0.22.1",
+        note = "use nix::errno::Errno::EWOULDBLOCK instead"
+    )]
+    pub const EWOULDBLOCK: Errno = Errno::EAGAIN;
+    #[deprecated(
+        since = "0.22.1",
+        note = "use nix::errno::Errno::EDEADLOCK instead"
+    )]
+    pub const EDEADLOCK:   Errno = Errno::EDEADLK;
+    #[deprecated(
+        since = "0.22.1",
+        note = "use nix::errno::Errno::ENOTSUP instead"
+    )]
+    pub const ENOTSUP:  Errno = Errno::EOPNOTSUPP;
+
     impl Errno {
         pub const EWOULDBLOCK: Errno = Errno::EAGAIN;
         pub const EDEADLOCK:   Errno = Errno::EDEADLK;
         pub const ENOTSUP:     Errno = Errno::EOPNOTSUPP;
     }
 
-    pub fn from_i32(e: i32) -> Errno {
+    pub const fn from_i32(e: i32) -> Errno {
         use self::Errno::*;
 
         match e {
@@ -1057,6 +1076,7 @@ mod consts {
 mod consts {
     #[derive(Clone, Copy, Debug, Eq, PartialEq)]
     #[repr(i32)]
+    #[non_exhaustive]
     pub enum Errno {
         UnknownErrno    = 0,
         EPERM           = libc::EPERM,
@@ -1167,13 +1187,29 @@ mod consts {
         EQFULL          = libc::EQFULL,
     }
 
+    #[deprecated(
+        since = "0.22.1",
+        note = "use nix::errno::Errno::ELAST instead"
+    )]
+    pub const ELAST:  Errno = Errno::EQFULL;
+    #[deprecated(
+        since = "0.22.1",
+        note = "use nix::errno::Errno::EWOULDBLOCK instead"
+    )]
+    pub const EWOULDBLOCK: Errno = Errno::EAGAIN;
+    #[deprecated(
+        since = "0.22.1",
+        note = "use nix::errno::Errno::EDEADLOCK instead"
+    )]
+    pub const EDEADLOCK:   Errno = Errno::EDEADLK;
+
     impl Errno {
         pub const ELAST: Errno       = Errno::EQFULL;
         pub const EWOULDBLOCK: Errno = Errno::EAGAIN;
         pub const EDEADLOCK:   Errno = Errno::EDEADLK;
     }
 
-    pub fn from_i32(e: i32) -> Errno {
+    pub const fn from_i32(e: i32) -> Errno {
         use self::Errno::*;
 
         match e {
@@ -1292,6 +1328,7 @@ mod consts {
 mod consts {
     #[derive(Clone, Copy, Debug, Eq, PartialEq)]
     #[repr(i32)]
+    #[non_exhaustive]
     pub enum Errno {
         UnknownErrno    = 0,
         EPERM           = libc::EPERM,
@@ -1392,6 +1429,27 @@ mod consts {
         EOWNERDEAD      = libc::EOWNERDEAD,
     }
 
+    #[deprecated(
+        since = "0.22.1",
+        note = "use nix::errno::Errno::ELAST instead"
+    )]
+    pub const ELAST: Errno       = Errno::EOWNERDEAD;
+    #[deprecated(
+        since = "0.22.1",
+        note = "use nix::errno::Errno::EWOULDBLOCK instead"
+    )]
+    pub const EWOULDBLOCK: Errno = Errno::EAGAIN;
+    #[deprecated(
+        since = "0.22.1",
+        note = "use nix::errno::Errno::EDEADLOCK instead"
+    )]
+    pub const EDEADLOCK:   Errno = Errno::EDEADLK;
+    #[deprecated(
+        since = "0.22.1",
+        note = "use nix::errno::Errno::EOPNOTSUPP instead"
+    )]
+    pub const EOPNOTSUPP:  Errno = Errno::ENOTSUP;
+
     impl Errno {
         pub const ELAST: Errno       = Errno::EOWNERDEAD;
         pub const EWOULDBLOCK: Errno = Errno::EAGAIN;
@@ -1399,7 +1457,7 @@ mod consts {
         pub const EOPNOTSUPP:  Errno = Errno::ENOTSUP;
     }
 
-    pub fn from_i32(e: i32) -> Errno {
+    pub const fn from_i32(e: i32) -> Errno {
         use self::Errno::*;
 
         match e {
@@ -1509,6 +1567,7 @@ mod consts {
 mod consts {
     #[derive(Clone, Copy, Debug, Eq, PartialEq)]
     #[repr(i32)]
+    #[non_exhaustive]
     pub enum Errno {
         UnknownErrno    = 0,
         EPERM           = libc::EPERM,
@@ -1607,6 +1666,27 @@ mod consts {
         EASYNC          = libc::EASYNC,
     }
 
+    #[deprecated(
+        since = "0.22.1",
+        note = "use nix::errno::Errno::ELAST instead"
+    )]
+    pub const ELAST: Errno       = Errno::EASYNC;
+    #[deprecated(
+        since = "0.22.1",
+        note = "use nix::errno::Errno::EWOULDBLOCK instead"
+    )]
+    pub const EWOULDBLOCK: Errno = Errno::EAGAIN;
+    #[deprecated(
+        since = "0.22.1",
+        note = "use nix::errno::Errno::EDEADLOCK instead"
+    )]
+    pub const EDEADLOCK:   Errno = Errno::EDEADLK;
+    #[deprecated(
+        since = "0.22.1",
+        note = "use nix::errno::Errno::EOPNOTSUPP instead"
+    )]
+    pub const EOPNOTSUPP:  Errno = Errno::ENOTSUP;
+
     impl Errno {
         pub const ELAST: Errno       = Errno::EASYNC;
         pub const EWOULDBLOCK: Errno = Errno::EAGAIN;
@@ -1614,7 +1694,7 @@ mod consts {
         pub const EOPNOTSUPP:  Errno = Errno::ENOTSUP;
     }
 
-    pub fn from_i32(e: i32) -> Errno {
+    pub const fn from_i32(e: i32) -> Errno {
         use self::Errno::*;
 
         match e {
@@ -1722,6 +1802,7 @@ mod consts {
 mod consts {
     #[derive(Clone, Copy, Debug, Eq, PartialEq)]
     #[repr(i32)]
+    #[non_exhaustive]
     pub enum Errno {
         UnknownErrno    = 0,
         EPERM           = libc::EPERM,
@@ -1821,12 +1902,23 @@ mod consts {
         EPROTO          = libc::EPROTO,
     }
 
+    #[deprecated(
+        since = "0.22.1",
+        note = "use nix::errno::Errno::ELAST instead"
+    )]
+    pub const ELAST: Errno       = Errno::ENOTSUP;
+    #[deprecated(
+        since = "0.22.1",
+        note = "use nix::errno::Errno::EWOULDBLOCK instead"
+    )]
+    pub const EWOULDBLOCK: Errno = Errno::EAGAIN;
+
     impl Errno {
         pub const ELAST: Errno       = Errno::ENOTSUP;
         pub const EWOULDBLOCK: Errno = Errno::EAGAIN;
     }
 
-    pub fn from_i32(e: i32) -> Errno {
+    pub const fn from_i32(e: i32) -> Errno {
         use self::Errno::*;
 
         match e {
@@ -1934,6 +2026,7 @@ mod consts {
 mod consts {
     #[derive(Clone, Copy, Debug, Eq, PartialEq)]
     #[repr(i32)]
+    #[non_exhaustive]
     pub enum Errno {
         UnknownErrno    = 0,
         EPERM           = libc::EPERM,
@@ -2034,12 +2127,23 @@ mod consts {
         EPROTO          = libc::EPROTO,
     }
 
+    #[deprecated(
+        since = "0.22.1",
+        note = "use nix::errno::Errno::ELAST instead"
+    )]
+    pub const ELAST: Errno       = Errno::ENOTSUP;
+    #[deprecated(
+        since = "0.22.1",
+        note = "use nix::errno::Errno::EWOULDBLOCK instead"
+    )]
+    pub const EWOULDBLOCK: Errno = Errno::EAGAIN;
+
     impl Errno {
         pub const ELAST: Errno       = Errno::ENOTSUP;
         pub const EWOULDBLOCK: Errno = Errno::EAGAIN;
     }
 
-    pub fn from_i32(e: i32) -> Errno {
+    pub const fn from_i32(e: i32) -> Errno {
         use self::Errno::*;
 
         match e {
@@ -2148,6 +2252,7 @@ mod consts {
 mod consts {
     #[derive(Clone, Copy, Debug, Eq, PartialEq)]
     #[repr(i32)]
+    #[non_exhaustive]
     pub enum Errno {
         UnknownErrno = 0,
         EPERM = libc::EPERM,
@@ -2237,11 +2342,17 @@ mod consts {
         EPROTO = libc::EPROTO,
     }
 
+    #[deprecated(
+        since = "0.22.1",
+        note = "use nix::errno::Errno::EWOULDBLOCK instead"
+    )]
+    pub const EWOULDBLOCK: Errno = Errno::EAGAIN;
+
     impl Errno {
         pub const EWOULDBLOCK: Errno = Errno::EAGAIN;
     }
 
-    pub fn from_i32(e: i32) -> Errno {
+    pub const fn from_i32(e: i32) -> Errno {
         use self::Errno::*;
 
         match e {
@@ -2339,6 +2450,7 @@ mod consts {
 mod consts {
     #[derive(Clone, Copy, Debug, Eq, PartialEq)]
     #[repr(i32)]
+    #[non_exhaustive]
     pub enum Errno {
         UnknownErrno = 0,
         EPERM = libc::EPERM,
@@ -2464,12 +2576,23 @@ mod consts {
         ESTALE = libc::ESTALE,
     }
 
+    #[deprecated(
+        since = "0.22.1",
+        note = "use nix::errno::Errno::ELAST instead"
+    )]
+    pub const ELAST: Errno = Errno::ELAST;
+    #[deprecated(
+        since = "0.22.1",
+        note = "use nix::errno::Errno::EWOULDBLOCK instead"
+    )]
+    pub const EWOULDBLOCK: Errno = Errno::EAGAIN;
+
     impl Errno {
         pub const ELAST: Errno       = Errno::ESTALE;
         pub const EWOULDBLOCK: Errno = Errno::EAGAIN;
     }
 
-    pub fn from_i32(e: i32) -> Errno {
+    pub const fn from_i32(e: i32) -> Errno {
         use self::Errno::*;
 
         match e {
