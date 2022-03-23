@@ -1,7 +1,8 @@
 use std::ffi::CString;
 use std::str;
 
-use nix::errno::Errno;
+use nix::errno::Errno::*;
+use nix::Error::Sys;
 use nix::mqueue::{mq_open, mq_close, mq_send, mq_receive, mq_attr_member_t};
 use nix::mqueue::{MqAttr, MQ_OFlag};
 use nix::sys::stat::Mode;
@@ -15,7 +16,7 @@ fn test_mq_send_and_receive() {
     let oflag0 = MQ_OFlag::O_CREAT | MQ_OFlag::O_WRONLY;
     let mode = Mode::S_IWUSR | Mode::S_IRUSR | Mode::S_IRGRP | Mode::S_IROTH;
     let r0 = mq_open(mq_name, oflag0, mode, Some(&attr));
-    if let Err(Errno::ENOSYS) = r0 {
+    if let Err(Sys(ENOSYS)) = r0 {
         println!("message queues not supported or module not loaded?");
         return;
     };
@@ -46,7 +47,7 @@ fn test_mq_getattr() {
     let oflag = MQ_OFlag::O_CREAT | MQ_OFlag::O_WRONLY;
     let mode = Mode::S_IWUSR | Mode::S_IRUSR | Mode::S_IRGRP | Mode::S_IROTH;
     let r = mq_open(mq_name, oflag, mode, Some(&initial_attr));
-    if let Err(Errno::ENOSYS) = r {
+    if let Err(Sys(ENOSYS)) = r {
         println!("message queues not supported or module not loaded?");
         return;
     };
@@ -60,11 +61,7 @@ fn test_mq_getattr() {
 // FIXME: Fix failures for mips in QEMU
 #[test]
 #[cfg(not(any(target_os = "netbsd")))]
-#[cfg_attr(all(
-        qemu,
-        any(target_arch = "mips", target_arch = "mips64")
-    ), ignore
-)]
+#[cfg_attr(any(target_arch = "mips", target_arch = "mips64"), ignore)]
 fn test_mq_setattr() {
     use nix::mqueue::{mq_getattr, mq_setattr};
     const MSG_SIZE: mq_attr_member_t = 32;
@@ -73,7 +70,7 @@ fn test_mq_setattr() {
     let oflag = MQ_OFlag::O_CREAT | MQ_OFlag::O_WRONLY;
     let mode = Mode::S_IWUSR | Mode::S_IRUSR | Mode::S_IRGRP | Mode::S_IROTH;
     let r = mq_open(mq_name, oflag, mode, Some(&initial_attr));
-    if let Err(Errno::ENOSYS) = r {
+    if let Err(Sys(ENOSYS)) = r {
         println!("message queues not supported or module not loaded?");
         return;
     };
@@ -101,11 +98,7 @@ fn test_mq_setattr() {
 // FIXME: Fix failures for mips in QEMU
 #[test]
 #[cfg(not(any(target_os = "netbsd")))]
-#[cfg_attr(all(
-        qemu,
-        any(target_arch = "mips", target_arch = "mips64")
-    ), ignore
-)]
+#[cfg_attr(any(target_arch = "mips", target_arch = "mips64"), ignore)]
 fn test_mq_set_nonblocking() {
     use nix::mqueue::{mq_getattr, mq_set_nonblock, mq_remove_nonblock};
     const MSG_SIZE: mq_attr_member_t = 32;
@@ -114,7 +107,7 @@ fn test_mq_set_nonblocking() {
     let oflag = MQ_OFlag::O_CREAT | MQ_OFlag::O_WRONLY;
     let mode = Mode::S_IWUSR | Mode::S_IRUSR | Mode::S_IRGRP | Mode::S_IROTH;
     let r = mq_open(mq_name, oflag, mode, Some(&initial_attr));
-    if let Err(Errno::ENOSYS) = r {
+    if let Err(Sys(ENOSYS)) = r {
         println!("message queues not supported or module not loaded?");
         return;
     };
@@ -139,7 +132,7 @@ fn test_mq_unlink() {
     let oflag = MQ_OFlag::O_CREAT | MQ_OFlag::O_WRONLY;
     let mode = Mode::S_IWUSR | Mode::S_IRUSR | Mode::S_IRGRP | Mode::S_IROTH;
     let r = mq_open(mq_name_opened, oflag, mode, Some(&initial_attr));
-    if let Err(Errno::ENOSYS) = r {
+    if let Err(Sys(ENOSYS)) = r {
         println!("message queues not supported or module not loaded?");
         return;
     };
@@ -149,9 +142,9 @@ fn test_mq_unlink() {
     assert_eq!(res_unlink, Ok(()) );
 
     let res_unlink_not_opened = mq_unlink(mq_name_not_opened);
-    assert_eq!(res_unlink_not_opened, Err(Errno::ENOENT) );
+    assert_eq!(res_unlink_not_opened, Err(Sys(ENOENT)) );
 
     mq_close(mqd).unwrap();
     let res_unlink_after_close = mq_unlink(mq_name_opened);
-    assert_eq!(res_unlink_after_close, Err(Errno::ENOENT) );
+    assert_eq!(res_unlink_after_close, Err(Sys(ENOENT)) );
 }
