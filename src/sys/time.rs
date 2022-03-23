@@ -77,7 +77,11 @@ impl From<timespec> for TimeSpec {
 
 impl From<Duration> for TimeSpec {
     fn from(duration: Duration) -> Self {
-        Self::from_duration(duration)
+        #[cfg_attr(target_env = "musl", allow(deprecated))] // https://github.com/rust-lang/libc/issues/1848
+        TimeSpec(timespec {
+            tv_sec: duration.as_secs() as time_t,
+            tv_nsec: duration.subsec_nanos() as timespec_tv_nsec_t
+        })
     }
 }
 
@@ -187,24 +191,12 @@ impl TimeSpec {
     }
 
     #[cfg_attr(target_env = "musl", allow(deprecated))] // https://github.com/rust-lang/libc/issues/1848
-    pub const fn tv_sec(&self) -> time_t {
+    pub fn tv_sec(&self) -> time_t {
         self.0.tv_sec
     }
 
-    pub const fn tv_nsec(&self) -> timespec_tv_nsec_t {
+    pub fn tv_nsec(&self) -> timespec_tv_nsec_t {
         self.0.tv_nsec
-    }
-
-    pub const fn from_duration(duration: Duration) -> Self {
-        #[cfg_attr(target_env = "musl", allow(deprecated))] // https://github.com/rust-lang/libc/issues/1848
-        TimeSpec(timespec {
-            tv_sec: duration.as_secs() as time_t,
-            tv_nsec: duration.subsec_nanos() as timespec_tv_nsec_t
-        })
-    }
-
-    pub const fn from_timespec(timespec: timespec) -> Self {
-        Self(timespec)
     }
 }
 
@@ -404,11 +396,11 @@ impl TimeVal {
     }
 
     #[cfg_attr(target_env = "musl", allow(deprecated))] // https://github.com/rust-lang/libc/issues/1848
-    pub const fn tv_sec(&self) -> time_t {
+    pub fn tv_sec(&self) -> time_t {
         self.0.tv_sec
     }
 
-    pub const fn tv_usec(&self) -> suseconds_t {
+    pub fn tv_usec(&self) -> suseconds_t {
         self.0.tv_usec
     }
 }

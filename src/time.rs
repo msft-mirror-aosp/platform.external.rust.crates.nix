@@ -6,7 +6,7 @@ use crate::sys::time::TimeSpec;
     target_os = "android",
     target_os = "emscripten",
 ))]
-use crate::unistd::Pid;
+use crate::{unistd::Pid, Error};
 use crate::{Errno, Result};
 use libc::{self, clockid_t};
 use std::mem::MaybeUninit;
@@ -20,7 +20,7 @@ pub struct ClockId(clockid_t);
 
 impl ClockId {
     /// Creates `ClockId` from raw `clockid_t`
-    pub const fn from_raw(clk_id: clockid_t) -> Self {
+    pub fn from_raw(clk_id: clockid_t) -> Self {
         ClockId(clk_id)
     }
 
@@ -61,7 +61,7 @@ impl ClockId {
     }
 
     /// Gets the raw `clockid_t` wrapped by `self`
-    pub const fn as_raw(self) -> clockid_t {
+    pub fn as_raw(self) -> clockid_t {
         self.0
     }
 
@@ -185,9 +185,9 @@ impl ClockId {
     pub const CLOCK_VIRTUAL: ClockId = ClockId(libc::CLOCK_VIRTUAL);
 }
 
-impl From<ClockId> for clockid_t {
-    fn from(clock_id: ClockId) -> Self {
-        clock_id.as_raw()
+impl Into<clockid_t> for ClockId {
+    fn into(self) -> clockid_t {
+        self.as_raw()
     }
 }
 
@@ -255,6 +255,6 @@ pub fn clock_getcpuclockid(pid: Pid) -> Result<ClockId> {
         let res = unsafe { clk_id.assume_init() };
         Ok(ClockId::from(res))
     } else {
-        Err(Errno::from_i32(ret))
+        Err(Error::Sys(Errno::from_i32(ret)))
     }
 }
