@@ -21,13 +21,14 @@ mod test_mount {
     use nix::sys::stat::{self, Mode};
     use nix::unistd::getuid;
 
-    static SCRIPT_CONTENTS: &[u8] = b"#!/bin/sh
+    use tempfile;
+
+    static SCRIPT_CONTENTS: &'static [u8] = b"#!/bin/sh
 exit 23";
 
     const EXPECTED_STATUS: i32 = 23;
 
     const NONE: Option<&'static [u8]> = None;
-    #[allow(clippy::bind_instead_of_map)]   // False positive
     pub fn test_mount_tmpfs_without_flags_allows_rwx() {
         let tempdir = tempfile::tempdir().unwrap();
 

@@ -1,3 +1,4 @@
+use libc;
 use std::os::unix::io::RawFd;
 use crate::Result;
 use crate::errno::Errno;
