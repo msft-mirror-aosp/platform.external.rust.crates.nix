@@ -34,8 +34,6 @@ libc_bitflags! {
         AT_NO_AUTOMOUNT;
         #[cfg(any(target_os = "android", target_os = "linux"))]
         AT_EMPTY_PATH;
-        #[cfg(any(target_os = "illumos", target_os = "solaris"))]
-        AT_EACCESS;
     }
 }
 
@@ -50,7 +48,6 @@ libc_bitflags!(
         /// Open the file in append-only mode.
         O_APPEND;
         /// Generate a signal when input or output becomes possible.
-        #[cfg(not(any(target_os = "illumos", target_os = "solaris")))]
         O_ASYNC;
         /// Closes the file descriptor once an `execve` call is made.
         ///
@@ -66,7 +63,6 @@ libc_bitflags!(
                   target_os = "netbsd"))]
         O_DIRECT;
         /// If the specified path isn't a directory, fail.
-        #[cfg(not(any(target_os = "illumos", target_os = "solaris")))]
         O_DIRECTORY;
         /// Implicitly follow each `write()` with an `fdatasync()`.
         #[cfg(any(target_os = "android",
@@ -166,7 +162,7 @@ libc_bitflags!(
 );
 
 // The conversion is not identical on all operating systems.
-#[allow(clippy::useless_conversion)]
+#[allow(clippy::identity_conversion)]
 pub fn open<P: ?Sized + NixPath>(path: &P, oflag: OFlag, mode: Mode) -> Result<RawFd> {
     let fd = path.with_nix_path(|cstr| {
         unsafe { libc::open(cstr.as_ptr(), oflag.bits(), mode.bits() as c_uint) }
@@ -176,7 +172,7 @@ pub fn open<P: ?Sized + NixPath>(path: &P, oflag: OFlag, mode: Mode) -> Result<R
 }
 
 // The conversion is not identical on all operating systems.
-#[allow(clippy::useless_conversion)]
+#[allow(clippy::identity_conversion)]
 #[cfg(not(target_os = "redox"))]
 pub fn openat<P: ?Sized + NixPath>(
     dirfd: RawFd,
@@ -204,43 +200,6 @@ pub fn renameat<P1: ?Sized + NixPath, P2: ?Sized + NixPath>(
                 old_cstr.as_ptr(),
                 at_rawfd(new_dirfd),
                 new_cstr.as_ptr(),
-            )
-        })
-    })??;
-    Errno::result(res).map(drop)
-}
-
-#[cfg(all(
-    target_os = "linux",
-    target_env = "gnu",
-))]
-libc_bitflags! {
-    pub struct RenameFlags: u32 {
-        RENAME_EXCHANGE;
-        RENAME_NOREPLACE;
-        RENAME_WHITEOUT;
-    }
-}
-
-#[cfg(all(
-    target_os = "linux",
-    target_env = "gnu",
-))]
-pub fn renameat2<P1: ?Sized + NixPath, P2: ?Sized + NixPath>(
-    old_dirfd: Option<RawFd>,
-    old_path: &P1,
-    new_dirfd: Option<RawFd>,
-    new_path: &P2,
-    flags: RenameFlags,
-) -> Result<()> {
-    let res = old_path.with_nix_path(|old_cstr| {
-        new_path.with_nix_path(|new_cstr| unsafe {
-            libc::renameat2(
-                at_rawfd(old_dirfd),
-                old_cstr.as_ptr(),
-                at_rawfd(new_dirfd),
-                new_cstr.as_ptr(),
-                flags.bits(),
             )
         })
     })??;
@@ -289,19 +248,8 @@ fn inner_readlink<P: ?Sized + NixPath>(dirfd: Option<RawFd>, path: &P) -> Result
     }
     // Uh oh, the result is too long...
     // Let's try to ask lstat how many bytes to allocate.
-    let reported_size = match dirfd {
-        #[cfg(target_os = "redox")]
-        Some(_) => unreachable!(),
-        #[cfg(any(target_os = "android", target_os = "linux"))]
-        Some(dirfd) => {
-            let flags = if path.is_empty() { AtFlags::AT_EMPTY_PATH } else { AtFlags::empty() };
-            super::sys::stat::fstatat(dirfd, path, flags | AtFlags::AT_SYMLINK_NOFOLLOW)
-        },
-        #[cfg(not(any(target_os = "android", target_os = "linux", target_os = "redox")))]
-        Some(dirfd) => super::sys::stat::fstatat(dirfd, path, AtFlags::AT_SYMLINK_NOFOLLOW),
-        None => super::sys::stat::lstat(path)
-    }
-        .map(|x| x.st_size)
+    let reported_size = super::sys::stat::lstat(path)
+        .and_then(|x| Ok(x.st_size))
         .unwrap_or(0);
     let mut try_size = if reported_size > 0 {
         // Note: even if `lstat`'s apparently valid answer turns out to be
@@ -325,7 +273,7 @@ fn inner_readlink<P: ?Sized + NixPath>(dirfd: Option<RawFd>, path: &P) -> Result
                 Some(next_size) => try_size = next_size,
                 // It's absurd that this would happen, but handle it sanely
                 // anyway.
-                None => break Err(Errno::ENAMETOOLONG),
+                None => break Err(super::Error::Sys(Errno::ENAMETOOLONG)),
             }
         }
     }
@@ -374,7 +322,6 @@ libc_bitflags!(
 
 #[cfg(not(target_os = "redox"))]
 #[derive(Debug, Eq, Hash, PartialEq)]
-#[non_exhaustive]
 pub enum FcntlArg<'a> {
     F_DUPFD(RawFd),
     F_DUPFD_CLOEXEC(RawFd),
@@ -406,7 +353,6 @@ pub enum FcntlArg<'a> {
 
 #[cfg(target_os = "redox")]
 #[derive(Debug, Clone, Copy, Eq, Hash, PartialEq)]
-#[non_exhaustive]
 pub enum FcntlArg {
     F_DUPFD(RawFd),
     F_DUPFD_CLOEXEC(RawFd),
@@ -456,7 +402,6 @@ pub fn fcntl(fd: RawFd, arg: FcntlArg) -> Result<c_int> {
 }
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-#[non_exhaustive]
 pub enum FlockArg {
     LockShared,
     LockExclusive,
@@ -646,12 +591,12 @@ pub fn fallocate(
 ))]
 mod posix_fadvise {
     use crate::errno::Errno;
+    use libc;
     use std::os::unix::io::RawFd;
     use crate::Result;
 
     libc_enum! {
         #[repr(i32)]
-        #[non_exhaustive]
         pub enum PosixFadviseAdvice {
             POSIX_FADV_NORMAL,
             POSIX_FADV_SEQUENTIAL,
@@ -667,14 +612,9 @@ mod posix_fadvise {
         offset: libc::off_t,
         len: libc::off_t,
         advice: PosixFadviseAdvice,
-    ) -> Result<()> {
+    ) -> Result<libc::c_int> {
         let res = unsafe { libc::posix_fadvise(fd, offset, len, advice as libc::c_int) };
-
-        if res == 0 {
-            Ok(())
-        } else {
-            Err(Errno::from_i32(res))
-        }
+        Errno::result(res)
     }
 }
 
@@ -691,6 +631,6 @@ pub fn posix_fallocate(fd: RawFd, offset: libc::off_t, len: libc::off_t) -> Resu
     match Errno::result(res) {
         Err(err) => Err(err),
         Ok(0) => Ok(()),
-        Ok(errno) => Err(Errno::from_i32(errno)),
+        Ok(errno) => Err(crate::Error::Sys(Errno::from_i32(errno))),
     }
 }
