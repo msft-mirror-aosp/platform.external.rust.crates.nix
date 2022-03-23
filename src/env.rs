@@ -1,25 +1,12 @@
-//! Environment variables
 use cfg_if::cfg_if;
-use std::fmt;
-
-/// Indicates that [`clearenv`] failed for some unknown reason
-#[derive(Clone, Copy, Debug)]
-pub struct ClearEnvError;
-
-impl fmt::Display for ClearEnvError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "clearenv failed")
-    }
-}
-
-impl std::error::Error for ClearEnvError {}
+use crate::{Error, Result};
 
 /// Clear the environment of all name-value pairs.
 ///
 /// On platforms where libc provides `clearenv()`, it will be used. libc's
 /// `clearenv()` is documented to return an error code but not set errno; if the
 /// return value indicates a failure, this function will return
-/// [`ClearEnvError`].
+/// `Error::UnsupportedOperation`.
 ///
 /// On platforms where libc does not provide `clearenv()`, a fallback
 /// implementation will be used that iterates over all environment variables and
@@ -38,7 +25,8 @@ impl std::error::Error for ClearEnvError {}
 ///  `environ` is currently held. The latter is not an issue if the only other
 ///  environment access in the program is via `std::env`, but the requirement on
 ///  thread safety must still be upheld.
-pub unsafe fn clearenv() -> std::result::Result<(), ClearEnvError> {
+pub unsafe fn clearenv() -> Result<()> {
+    let ret;
     cfg_if! {
         if #[cfg(any(target_os = "fuchsia",
                      target_os = "wasi",
@@ -47,19 +35,19 @@ pub unsafe fn clearenv() -> std::result::Result<(), ClearEnvError> {
                      target_os = "linux",
                      target_os = "android",
                      target_os = "emscripten"))] {
-            let ret = libc::clearenv();
+            ret = libc::clearenv();
         } else {
             use std::env;
             for (name, _) in env::vars_os() {
                 env::remove_var(name);
             }
-            let ret = 0;
+            ret = 0;
         }
     }
 
     if ret == 0 {
         Ok(())
     } else {
-        Err(ClearEnvError)
+        Err(Error::UnsupportedOperation)
     }
 }

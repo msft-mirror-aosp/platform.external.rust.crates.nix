@@ -14,33 +14,19 @@ use cfg_if::cfg_if;
 cfg_if! {
     if #[cfg(any(target_os = "android", target_os = "linux"))] {
         #[macro_export] macro_rules! require_capability {
-            ($name:expr, $capname:ident) => {
+            ($capname:ident) => {
                 use ::caps::{Capability, CapSet, has_cap};
 
                 if !has_cap(None, CapSet::Effective, Capability::$capname)
                     .unwrap()
                 {
-                    skip!("{} requires capability {}. Skipping test.", $name, Capability::$capname);
+                    skip!("Insufficient capabilities. Skipping test.");
                 }
             }
         }
     } else if #[cfg(not(target_os = "redox"))] {
         #[macro_export] macro_rules! require_capability {
-            ($name:expr, $capname:ident) => {}
-        }
-    }
-}
-
-/// Skip the test if we don't have the ability to mount file systems.
-#[cfg(target_os = "freebsd")]
-#[macro_export] macro_rules! require_mount {
-    ($name:expr) => {
-        use ::sysctl::CtlValue;
-        use nix::unistd::Uid;
-
-        if !Uid::current().is_root() && CtlValue::Int(0) == ::sysctl::value("vfs.usermount").unwrap()
-        {
-            skip!("{} requires the ability to mount file systems. Skipping test.", $name);
+            ($capname:ident) => {}
         }
     }
 }
@@ -128,8 +114,8 @@ cfg_if! {
                 let mut version = Version::parse(fixed_release).unwrap();
 
                 //Keep only numeric parts
-                version.pre = semver::Prerelease::EMPTY;
-                version.build = semver::BuildMetadata::EMPTY;
+                version.pre.clear();
+                version.build.clear();
 
                 if !version_requirement.matches(&version) {
                     skip!("Skip {} because kernel version `{}` doesn't match the requirement `{}`",
