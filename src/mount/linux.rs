@@ -1,3 +1,4 @@
+#![allow(missing_docs)]
 use libc::{self, c_ulong, c_int};
 use crate::{Result, NixPath};
 use crate::errno::Errno;
@@ -38,6 +39,7 @@ libc_bitflags!(
         MS_KERNMOUNT;
         MS_I_VERSION;
         MS_STRICTATIME;
+        MS_LAZYTIME;
         MS_ACTIVE;
         MS_NOUSER;
         MS_RMT_MASK;
