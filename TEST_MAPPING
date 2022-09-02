@@ -7,6 +7,12 @@
   ],
   "presubmit": [
     {
+      "name": "VtsAidlDiceDemoteTargetTest"
+    },
+    {
+      "name": "VtsAidlDiceTargetTest"
+    },
+    {
       "name": "ZipFuseTest"
     },
     {
@@ -31,7 +37,13 @@
       "name": "diced_vendor_test"
     },
     {
+      "name": "keystore2_client_tests"
+    },
+    {
       "name": "keystore2_crypto_test_rust"
+    },
+    {
+      "name": "keystore2_legacy_blobs_test"
     },
     {
       "name": "keystore2_selinux_concurrency_test"
@@ -54,6 +66,12 @@
   ],
   "presubmit-rust": [
     {
+      "name": "VtsAidlDiceDemoteTargetTest"
+    },
+    {
+      "name": "VtsAidlDiceTargetTest"
+    },
+    {
       "name": "ZipFuseTest"
     },
     {
@@ -78,7 +96,13 @@
       "name": "diced_vendor_test"
     },
     {
+      "name": "keystore2_client_tests"
+    },
+    {
       "name": "keystore2_crypto_test_rust"
+    },
+    {
+      "name": "keystore2_legacy_blobs_test"
     },
     {
       "name": "keystore2_selinux_concurrency_test"
