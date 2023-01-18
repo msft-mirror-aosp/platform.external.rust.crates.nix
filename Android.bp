@@ -26,7 +26,7 @@ rust_library {
     host_supported: true,
     crate_name: "nix",
     cargo_env_compat: true,
-    cargo_pkg_version: "0.25.0",
+    cargo_pkg_version: "0.26.1",
     srcs: ["src/lib.rs"],
     edition: "2018",
     features: [
@@ -72,6 +72,7 @@ rust_library {
         "liblibc",
         "libmemoffset",
         "libpin_utils",
+        "libstatic_assertions",
     ],
     apex_available: [
         "//apex_available:platform",
