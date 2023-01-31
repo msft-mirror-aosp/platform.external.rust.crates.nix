@@ -3,196 +3,45 @@
   "imports": [
     {
       "path": "external/rust/crates/tokio"
-    }
-  ],
-  "presubmit": [
-    {
-      "name": "VtsAidlDiceDemoteTargetTest"
     },
     {
-      "name": "VtsAidlDiceTargetTest"
+      "path": "packages/modules/Virtualization/apkdmverity"
     },
     {
-      "name": "ZipFuseTest"
+      "path": "packages/modules/Virtualization/authfs"
     },
     {
-      "name": "apkdmverity.test"
+      "path": "packages/modules/Virtualization/encryptedstore"
     },
     {
-      "name": "authfs_device_test_src_lib"
+      "path": "packages/modules/Virtualization/libs/capabilities"
     },
     {
-      "name": "bluetooth_with_facades.test"
+      "path": "packages/modules/Virtualization/libs/devicemapper"
     },
     {
-      "name": "compos_verify.test"
+      "path": "packages/modules/Virtualization/microdroid_manager"
     },
     {
-      "name": "composd_cmd.test"
+      "path": "packages/modules/Virtualization/virtualizationmanager"
     },
     {
-      "name": "diced_open_dice_cbor_test"
+      "path": "packages/modules/Virtualization/vm"
     },
     {
-      "name": "diced_sample_inputs_test"
+      "path": "packages/modules/Virtualization/zipfuse"
     },
     {
-      "name": "diced_test"
+      "path": "system/security/diced"
     },
     {
-      "name": "diced_utils_test"
+      "path": "system/security/keystore2"
     },
     {
-      "name": "diced_vendor_test"
+      "path": "system/security/keystore2/legacykeystore"
     },
     {
-      "name": "encryptedstore.test"
-    },
-    {
-      "name": "fd_server.test"
-    },
-    {
-      "name": "keystore2_client_tests"
-    },
-    {
-      "name": "keystore2_crypto_test_rust"
-    },
-    {
-      "name": "keystore2_legacy_blobs_test"
-    },
-    {
-      "name": "keystore2_selinux_concurrency_test"
-    },
-    {
-      "name": "keystore2_test"
-    },
-    {
-      "name": "keystore2_test_utils_test"
-    },
-    {
-      "name": "legacykeystore_test"
-    },
-    {
-      "name": "libcap_rust.test"
-    },
-    {
-      "name": "libdm_rust.test"
-    },
-    {
-      "name": "libpvmfw_avb.integration_test"
-    },
-    {
-      "name": "microdroid_manager_test"
-    },
-    {
-      "name": "open_then_run.test"
-    },
-    {
-      "name": "rialto_test"
-    },
-    {
-      "name": "virtualizationmanager_device_test"
-    },
-    {
-      "name": "vm.test"
-    },
-    {
-      "name": "vmbase_example.integration_test"
-    }
-  ],
-  "presubmit-rust": [
-    {
-      "name": "VtsAidlDiceDemoteTargetTest"
-    },
-    {
-      "name": "VtsAidlDiceTargetTest"
-    },
-    {
-      "name": "ZipFuseTest"
-    },
-    {
-      "name": "apkdmverity.test"
-    },
-    {
-      "name": "authfs_device_test_src_lib"
-    },
-    {
-      "name": "bluetooth_with_facades.test"
-    },
-    {
-      "name": "compos_verify.test"
-    },
-    {
-      "name": "composd_cmd.test"
-    },
-    {
-      "name": "diced_open_dice_cbor_test"
-    },
-    {
-      "name": "diced_sample_inputs_test"
-    },
-    {
-      "name": "diced_test"
-    },
-    {
-      "name": "diced_utils_test"
-    },
-    {
-      "name": "diced_vendor_test"
-    },
-    {
-      "name": "encryptedstore.test"
-    },
-    {
-      "name": "fd_server.test"
-    },
-    {
-      "name": "keystore2_client_tests"
-    },
-    {
-      "name": "keystore2_crypto_test_rust"
-    },
-    {
-      "name": "keystore2_legacy_blobs_test"
-    },
-    {
-      "name": "keystore2_selinux_concurrency_test"
-    },
-    {
-      "name": "keystore2_test"
-    },
-    {
-      "name": "keystore2_test_utils_test"
-    },
-    {
-      "name": "legacykeystore_test"
-    },
-    {
-      "name": "libcap_rust.test"
-    },
-    {
-      "name": "libdm_rust.test"
-    },
-    {
-      "name": "libpvmfw_avb.integration_test"
-    },
-    {
-      "name": "microdroid_manager_test"
-    },
-    {
-      "name": "open_then_run.test"
-    },
-    {
-      "name": "rialto_test"
-    },
-    {
-      "name": "virtualizationmanager_device_test"
-    },
-    {
-      "name": "vm.test"
-    },
-    {
-      "name": "vmbase_example.integration_test"
+      "path": "system/security/keystore2/src/crypto"
     }
   ]
 }
