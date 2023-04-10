@@ -3,124 +3,45 @@
   "imports": [
     {
       "path": "external/rust/crates/tokio"
-    }
-  ],
-  "presubmit": [
-    {
-      "name": "VtsAidlDiceDemoteTargetTest"
     },
     {
-      "name": "VtsAidlDiceTargetTest"
+      "path": "packages/modules/Virtualization/apkdmverity"
     },
     {
-      "name": "ZipFuseTest"
+      "path": "packages/modules/Virtualization/authfs"
     },
     {
-      "name": "apkdmverity.test"
+      "path": "packages/modules/Virtualization/encryptedstore"
     },
     {
-      "name": "authfs_device_test_src_lib"
+      "path": "packages/modules/Virtualization/libs/capabilities"
     },
     {
-      "name": "diced_open_dice_cbor_test"
+      "path": "packages/modules/Virtualization/libs/devicemapper"
     },
     {
-      "name": "diced_sample_inputs_test"
+      "path": "packages/modules/Virtualization/microdroid_manager"
     },
     {
-      "name": "diced_test"
+      "path": "packages/modules/Virtualization/virtualizationmanager"
     },
     {
-      "name": "diced_utils_test"
+      "path": "packages/modules/Virtualization/vm"
     },
     {
-      "name": "diced_vendor_test"
+      "path": "packages/modules/Virtualization/zipfuse"
     },
     {
-      "name": "keystore2_client_tests"
+      "path": "system/security/diced"
     },
     {
-      "name": "keystore2_crypto_test_rust"
+      "path": "system/security/keystore2"
     },
     {
-      "name": "keystore2_legacy_blobs_test"
+      "path": "system/security/keystore2/legacykeystore"
     },
     {
-      "name": "keystore2_selinux_concurrency_test"
-    },
-    {
-      "name": "keystore2_test"
-    },
-    {
-      "name": "keystore2_test_utils_test"
-    },
-    {
-      "name": "legacykeystore_test"
-    },
-    {
-      "name": "microdroid_manager_test"
-    },
-    {
-      "name": "virtualizationservice_device_test"
-    }
-  ],
-  "presubmit-rust": [
-    {
-      "name": "VtsAidlDiceDemoteTargetTest"
-    },
-    {
-      "name": "VtsAidlDiceTargetTest"
-    },
-    {
-      "name": "ZipFuseTest"
-    },
-    {
-      "name": "apkdmverity.test"
-    },
-    {
-      "name": "authfs_device_test_src_lib"
-    },
-    {
-      "name": "diced_open_dice_cbor_test"
-    },
-    {
-      "name": "diced_sample_inputs_test"
-    },
-    {
-      "name": "diced_test"
-    },
-    {
-      "name": "diced_utils_test"
-    },
-    {
-      "name": "diced_vendor_test"
-    },
-    {
-      "name": "keystore2_client_tests"
-    },
-    {
-      "name": "keystore2_crypto_test_rust"
-    },
-    {
-      "name": "keystore2_legacy_blobs_test"
-    },
-    {
-      "name": "keystore2_selinux_concurrency_test"
-    },
-    {
-      "name": "keystore2_test"
-    },
-    {
-      "name": "keystore2_test_utils_test"
-    },
-    {
-      "name": "legacykeystore_test"
-    },
-    {
-      "name": "microdroid_manager_test"
-    },
-    {
-      "name": "virtualizationservice_device_test"
+      "path": "system/security/keystore2/src/crypto"
     }
   ]
 }
