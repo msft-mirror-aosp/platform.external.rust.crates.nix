@@ -67,7 +67,7 @@ rust_library {
         "zerocopy",
     ],
     rustlibs: [
-        "libbitflags-1.3.2",
+        "libbitflags",
         "libcfg_if",
         "liblibc",
         "libmemoffset",
