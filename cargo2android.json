@@ -1,10 +1,8 @@
 {
   "dependencies": true,
   "device": true,
+  "features": "event,feature,fs,ioctl,mount,mman,poll,sched,signal,socket,term,time,uio,user",
   "min-sdk-version": "29",
   "run": true,
-  "vendor-available": true,
-  "dep-suffixes": {
-    "bitflags": "-1.3.2"
-  }
+  "vendor-available": true
 }
