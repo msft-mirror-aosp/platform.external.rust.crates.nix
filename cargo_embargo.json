@@ -6,6 +6,7 @@
     "ioctl",
     "mount",
     "mman",
+    "net",
     "poll",
     "sched",
     "signal",

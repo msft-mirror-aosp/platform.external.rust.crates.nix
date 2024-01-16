@@ -37,6 +37,7 @@ rust_library {
         "memoffset",
         "mman",
         "mount",
+        "net",
         "poll",
         "process",
         "sched",
