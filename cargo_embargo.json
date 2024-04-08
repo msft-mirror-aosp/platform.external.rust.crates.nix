@@ -17,5 +17,10 @@
     "user"
   ],
   "min_sdk_version": "29",
-  "run_cargo": false
+  "run_cargo": false,
+  "package": {
+    "nix": {
+      "add_module_block": "module_block.bp.fragment"
+    }
+  }
 }
