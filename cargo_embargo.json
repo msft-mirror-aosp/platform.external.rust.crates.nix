@@ -3,6 +3,7 @@
     "event",
     "feature",
     "fs",
+    "inotify",
     "ioctl",
     "mount",
     "mman",
