@@ -24,6 +24,7 @@ rust_library {
         "event",
         "feature",
         "fs",
+        "inotify",
         "ioctl",
         "memoffset",
         "mman",
